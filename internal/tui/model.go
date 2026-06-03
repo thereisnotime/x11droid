@@ -28,10 +28,6 @@ type errMsg struct{ err error }
 type instancesMsg []container.Instance
 type logsMsg string
 type actionDoneMsg struct{ err error }
-type systemStatusMsg struct {
-	kernelStatus []kernel.ModuleStatus
-	imageExists  bool
-}
 type kernelStatusMsg []kernel.ModuleStatus
 type imageStatusMsg bool
 
@@ -101,15 +97,8 @@ func fetchInstances() tea.Msg {
 	return instancesMsg(list)
 }
 
-func fetchSystemStatus() tea.Msg {
-	return systemStatusMsg{
-		kernelStatus: kernel.Status(),
-		imageExists:  container.ImageExists("x11droid:latest"),
-	}
-}
-
-func fetchKernelStatus() tea.Msg  { return kernelStatusMsg(kernel.Status()) }
-func fetchImageStatus() tea.Msg   { return imageStatusMsg(container.ImageExists("x11droid:latest")) }
+func fetchKernelStatus() tea.Msg { return kernelStatusMsg(kernel.Status()) }
+func fetchImageStatus() tea.Msg  { return imageStatusMsg(container.ImageExists("x11droid:latest")) }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -136,11 +125,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case logsMsg:
 		m.logs = string(msg)
 		m.showLogs = true
-		return m, nil
-
-	case systemStatusMsg:
-		m.kernelStatus = msg.kernelStatus
-		m.imageExists = msg.imageExists
 		return m, nil
 
 	case kernelStatusMsg:
@@ -244,11 +228,11 @@ func (m Model) handleMouseWheel(msg tea.MouseMsg) Model {
 			m.setupCursor++
 		}
 	case viewSpawn:
-		next := m.spawnCursor
+		var next int
 		if up {
-			next = (m.spawnCursor + 2) % 3
+			next = (m.spawnCursor + spawnFields - 1) % spawnFields
 		} else {
-			next = (m.spawnCursor + 1) % 3
+			next = (m.spawnCursor + 1) % spawnFields
 		}
 		if next == 0 {
 			m.spawnInput.Focus()

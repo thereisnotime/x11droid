@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"text/tabwriter"
@@ -10,6 +11,11 @@ import (
 	"github.com/thereisnotime/x11droid/internal/container"
 	"github.com/thereisnotime/x11droid/internal/kernel"
 )
+
+// twPrintf writes to a tabwriter, ignoring errors that surface through Flush.
+func twPrintf(w io.Writer, format string, a ...any) {
+	_, _ = fmt.Fprintf(w, format, a...)
+}
 
 func cmdList() *cobra.Command {
 	return &cobra.Command{
@@ -22,9 +28,9 @@ func cmdList() *cobra.Command {
 				return err
 			}
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			fmt.Fprintln(w, "NAME\tID\tSTATUS\tIMAGE")
+			twPrintf(w, "NAME\tID\tSTATUS\tIMAGE\n")
 			for _, i := range instances {
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", i.Name, i.ID, i.Status, i.Image)
+				twPrintf(w, "%s\t%s\t%s\t%s\n", i.Name, i.ID, i.Status, i.Image)
 			}
 			return w.Flush()
 		},
@@ -143,13 +149,13 @@ func cmdSetupStatus() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 
-			fmt.Fprintln(w, "COMPONENT\tSTATUS")
+			twPrintf(w, "COMPONENT\tSTATUS\n")
 
 			podmanOK := "ok"
 			if !container.PodmanInstalled() {
 				podmanOK = "missing"
 			}
-			fmt.Fprintf(w, "podman\t%s\n", podmanOK)
+			twPrintf(w, "podman\t%s\n", podmanOK)
 
 			for _, mod := range kernel.Status() {
 				state := "missing"
@@ -159,14 +165,14 @@ func cmdSetupStatus() *cobra.Command {
 				case kernel.StateBuiltIn, kernel.StateOptional:
 					state = "built-in"
 				}
-				fmt.Fprintf(w, "%s\t%s\n", mod.Name, state)
+				twPrintf(w, "%s\t%s\n", mod.Name, state)
 			}
 
 			imageState := "not built"
 			if container.ImageExists("x11droid:latest") {
 				imageState = "ok"
 			}
-			fmt.Fprintf(w, "x11droid:latest\t%s\n", imageState)
+			twPrintf(w, "x11droid:latest\t%s\n", imageState)
 
 			return w.Flush()
 		},

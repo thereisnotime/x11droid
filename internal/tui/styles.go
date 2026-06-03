@@ -3,7 +3,6 @@ package tui
 import "github.com/charmbracelet/lipgloss"
 
 var (
-	colorBg      = lipgloss.Color("#1a1a2e")
 	colorSurface = lipgloss.Color("#16213e")
 	colorBorder  = lipgloss.Color("#0f3460")
 	colorAccent  = lipgloss.Color("#e94560")
@@ -58,11 +57,6 @@ var (
 	styleValue = lipgloss.NewStyle().
 			Foreground(colorText)
 
-	styleBox = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(colorBorder).
-			Padding(1, 2)
-
 	styleAction = lipgloss.NewStyle().
 			Foreground(colorText).
 			Padding(0, 1)
@@ -76,9 +70,6 @@ var (
 	styleError = lipgloss.NewStyle().
 			Foreground(colorRed).
 			Bold(true)
-
-	styleSuccess = lipgloss.NewStyle().
-			Foreground(colorGreen)
 
 	styleInput = lipgloss.NewStyle().
 			Foreground(colorText).

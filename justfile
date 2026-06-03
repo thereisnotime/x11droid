@@ -1,6 +1,7 @@
-go := "asdf exec go"
+go   := "asdf exec go"
+lint := "asdf exec golangci-lint"
 binary := "x11droid"
-image := "x11droid:latest"
+image  := "x11droid:latest"
 
 # show this help
 default:
@@ -11,7 +12,13 @@ default:
     @echo "  \033[32minstall\033[0m        build and copy to ~/.local/bin"
     @echo "  \033[32mclean\033[0m          remove built binary"
     @echo "  \033[32mtidy\033[0m           go mod tidy"
+    @echo ""
+    @echo "\033[1;33m QUALITY\033[0m"
+    @echo "  \033[32mtest\033[0m           go test ./..."
+    @echo "  \033[32mtest-v\033[0m         go test -v ./..."
+    @echo "  \033[32mlint\033[0m           golangci-lint run"
     @echo "  \033[32mvet\033[0m            go vet ./..."
+    @echo "  \033[32mcheck\033[0m          vet + test + lint"
     @echo ""
     @echo "\033[1;33m KERNEL\033[0m"
     @echo "  \033[32mmodules-load\033[0m   load binder_linux (+ ashmem_linux)"
@@ -32,7 +39,7 @@ run: build
     ./{{binary}}
 
 install: build
-    cp {{binary}} ~/.local/bin/{{binary}}
+    cp {{binary}} /tmp/{{binary}}_install && mv /tmp/{{binary}}_install ~/.local/bin/{{binary}}
     @echo "installed to ~/.local/bin/{{binary}}"
 
 tidy:
@@ -40,6 +47,17 @@ tidy:
 
 vet:
     {{go}} vet ./...
+
+test:
+    {{go}} test ./...
+
+test-v:
+    {{go}} test -v ./...
+
+lint:
+    {{lint}} run ./...
+
+check: vet test lint
 
 clean:
     rm -f {{binary}}

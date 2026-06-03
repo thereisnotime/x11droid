@@ -243,7 +243,7 @@ func renderHelp(m Model) string {
 	desc := lipgloss.NewStyle().Foreground(colorSubtext)
 
 	row := func(k, d string) string {
-		return pad.Render(key.Render(k) + desc.Render(d)) + "\n"
+		return pad.Render(key.Render(k)+desc.Render(d)) + "\n"
 	}
 
 	sb.WriteString("\n")
@@ -304,15 +304,17 @@ func renderHelp(m Model) string {
 	sb.WriteString("\n")
 	infoKey := lipgloss.NewStyle().Foreground(colorSubtext).Width(20)
 	infoVal := func(v, good, bad string) string {
-		s := lipgloss.NewStyle()
-		if v == good {
-			s = s.Foreground(colorGreen)
-		} else if v == bad || v == "" {
-			s = s.Foreground(colorRed)
-		} else {
-			s = s.Foreground(colorYellow)
+		var color lipgloss.Color
+		switch v {
+		case good:
+			color = colorGreen
+		case bad, "":
+			color = colorRed
+		default:
+			color = colorYellow
 		}
-		return pad.Render(infoKey.Render("session type") + s.Render(v)) + "\n"
+		s := lipgloss.NewStyle().Foreground(color)
+		return pad.Render(infoKey.Render("session type")+s.Render(v)) + "\n"
 	}
 	sb.WriteString(infoVal(m.session.KindLabel(), "X11", "Wayland"))
 
@@ -324,10 +326,10 @@ func renderHelp(m Model) string {
 	if disp == "" {
 		disp = "(not set)"
 	}
-	sb.WriteString(pad.Render(infoKey.Render("$DISPLAY") + dispStyle.Render(disp)) + "\n")
+	sb.WriteString(pad.Render(infoKey.Render("$DISPLAY")+dispStyle.Render(disp)) + "\n")
 
 	for _, mod := range m.kernelStatus {
-		sb.WriteString(pad.Render(infoKey.Render(mod.Name) + moduleStateBadge(mod)) + "\n")
+		sb.WriteString(pad.Render(infoKey.Render(mod.Name)+moduleStateBadge(mod)) + "\n")
 	}
 
 	imgStyle := lipgloss.NewStyle()
@@ -338,11 +340,11 @@ func renderHelp(m Model) string {
 	} else {
 		imgStyle = imgStyle.Foreground(colorRed)
 	}
-	sb.WriteString(pad.Render(infoKey.Render("container image") + imgStyle.Render(imgLabel)) + "\n")
+	sb.WriteString(pad.Render(infoKey.Render("container image")+imgStyle.Render(imgLabel)) + "\n")
 
 	if w := m.session.Warning(); w != "" {
 		sb.WriteString("\n")
-		sb.WriteString(pad.Render(lipgloss.NewStyle().Foreground(colorYellow).Render("⚠  " + w)) + "\n")
+		sb.WriteString(pad.Render(lipgloss.NewStyle().Foreground(colorYellow).Render("⚠  "+w)) + "\n")
 	}
 
 	return sb.String()
@@ -380,4 +382,3 @@ func truncate(s string, n int) string {
 	}
 	return s[:n-1] + "…"
 }
-
