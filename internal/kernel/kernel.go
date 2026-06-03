@@ -1,7 +1,9 @@
 package kernel
 
 import (
+	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 )
 
@@ -60,6 +62,36 @@ func AllLoaded() bool {
 		}
 	}
 	return true
+}
+
+func Load() error {
+	mods := append(required, optional...)
+	for _, m := range mods {
+		out, err := exec.Command("sudo", "modprobe", m).CombinedOutput()
+		if err != nil {
+			if m != required[0] && strings.Contains(string(out), "not found") {
+				continue
+			}
+			return fmt.Errorf("modprobe %s: %w\n%s", m, err, out)
+		}
+	}
+	return nil
+}
+
+func Unload() error {
+	mods := append(required, optional...)
+	for i := len(mods) - 1; i >= 0; i-- {
+		m := mods[i]
+		out, err := exec.Command("sudo", "rmmod", m).CombinedOutput()
+		if err != nil {
+			if strings.Contains(string(out), "not currently loaded") ||
+				strings.Contains(string(out), "not found") {
+				continue
+			}
+			return fmt.Errorf("rmmod %s: %w\n%s", m, err, out)
+		}
+	}
+	return nil
 }
 
 func BinderDeviceExists() bool {
