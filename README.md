@@ -11,15 +11,65 @@ Each instance is an isolated Podman container with a nested Wayland compositor (
 
 ## How it works
 
-```
-Your X11 desktop
-  └─ Podman container (x11droid:latest)
-       └─ cage (nested Wayland compositor) → forwards to $DISPLAY
-            └─ waydroid session
-                 └─ Android (LXC container, shared kernel)
+```mermaid
+graph TD
+    subgraph HOST["Host — X11 Session"]
+        TUI["x11droid TUI\nGo · Bubble Tea"]
+        PODMAN["Podman"]
+
+        subgraph CONTAINER["Podman Container  ─  x11droid:latest"]
+            CAGE["cage / weston\nnested Wayland compositor"]
+
+            subgraph WD["Waydroid Session"]
+                WDSVC["waydroid services\nAndroid HAL / SurfaceFlinger"]
+
+                subgraph LXC["Android  ─  LXC Container"]
+                    INIT["Android init + system services"]
+                    APPS["Android Apps  ·  ART runtime"]
+                end
+            end
+        end
+
+        subgraph KERNEL["Linux Kernel  (shared)"]
+            BINDER["binder_linux\nAndroid IPC"]
+            ASHMEM["ashmem_linux\nshared memory"]
+        end
+    end
+
+    X11["X11 Display Server\n:0  /tmp/.X11-unix"]
+
+    TUI -- "podman CLI\nspawn · start · stop · remove" --> PODMAN
+    PODMAN -- "create / manage" --> CONTAINER
+    CAGE -- "X11 client\n DISPLAY env + socket" --> X11
+    CAGE -- "Wayland socket\nwayland-0" --> WDSVC
+    WDSVC --> LXC
+    INIT --> APPS
+    LXC -- "binder IPC" --> BINDER
+    LXC -- "shared mem" --> ASHMEM
+    BINDER --> KERNEL
+    ASHMEM --> KERNEL
+
+    style HOST fill:#1a1a2e,stroke:#444,color:#ccc
+    style CONTAINER fill:#16213e,stroke:#555,color:#ccc
+    style WD fill:#0f3460,stroke:#666,color:#ccc
+    style LXC fill:#533483,stroke:#777,color:#ddd
+    style KERNEL fill:#1a1a1a,stroke:#333,color:#aaa
+    style TUI fill:#2d6a4f,stroke:#52b788,color:#fff
+    style PODMAN fill:#892CA0,stroke:#c77dff,color:#fff
+    style CAGE fill:#1d3557,stroke:#457b9d,color:#fff
+    style X11 fill:#333,stroke:#666,color:#bbb
+    style WDSVC fill:#023e8a,stroke:#0096c7,color:#fff
+    style BINDER fill:#3d0000,stroke:#9d0208,color:#ffc,font-size:12px
+    style ASHMEM fill:#3d0000,stroke:#9d0208,color:#ffc,font-size:12px
+    style INIT fill:#4a1942,stroke:#9b5de5,color:#fff
+    style APPS fill:#4a1942,stroke:#9b5de5,color:#fff
 ```
 
-The containers share your host kernel via `binder_linux` (Android IPC). No VM, no emulation — Android runs natively on your CPU.
+**Control plane:** x11droid manages container lifecycle via the `podman` CLI.
+
+**Display path:** cage runs as an X11 client inside the container, forwarding its Wayland compositor output to your `$DISPLAY` socket. Android surfaces appear as regular X11 windows.
+
+**Kernel path:** Android IPC (`binder`) runs directly on your host kernel — no emulation, no VM. Apps execute natively at full CPU speed.
 
 ## Prerequisites
 
