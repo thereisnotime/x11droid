@@ -33,7 +33,11 @@ type buildDoneMsg struct {
 	imageExists bool
 }
 type kernelStatusMsg []kernel.ModuleStatus
-type imageStatusMsg bool
+type imageStatusMsg struct {
+	exists bool
+	valid  bool // false when the check failed (e.g. sudo not authenticated)
+}
+type sudoStatusMsg bool
 
 type Model struct {
 	view      view
@@ -68,6 +72,7 @@ type Model struct {
 	setupCursor     int
 	podmanInstalled bool
 	prereqsChecked  bool
+	sudoOK          bool
 }
 
 func newSpawnInput() textinput.Model {
@@ -90,7 +95,7 @@ func New(sess system.Info) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return fetchInstances
+	return tea.Batch(fetchInstances, fetchSudoStatus, fetchImageStatus, fetchKernelStatus)
 }
 
 func fetchInstances() tea.Msg {
@@ -102,7 +107,11 @@ func fetchInstances() tea.Msg {
 }
 
 func fetchKernelStatus() tea.Msg { return kernelStatusMsg(kernel.Status()) }
-func fetchImageStatus() tea.Msg  { return imageStatusMsg(container.ImageExists("x11droid:latest")) }
+func fetchImageStatus() tea.Msg {
+	exists, ok := container.ImageExistsChecked("x11droid:latest")
+	return imageStatusMsg{exists: exists, valid: ok}
+}
+func fetchSudoStatus() tea.Msg { return sudoStatusMsg(container.SudoAuthenticated()) }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -136,8 +145,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case imageStatusMsg:
-		m.imageExists = bool(msg)
+		if msg.valid {
+			m.imageExists = msg.exists
+		}
 		m.prereqsChecked = true
+		return m, nil
+
+	case sudoStatusMsg:
+		m.sudoOK = bool(msg)
 		return m, nil
 
 	case buildDoneMsg:
@@ -151,7 +166,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = &simpleErr{"build exited cleanly but image not found — check logs"}
 			m.statusMsg = ""
 		}
-		return m, fetchKernelStatus
+		return m, tea.Batch(fetchKernelStatus, fetchSudoStatus)
 
 	case actionDoneMsg:
 		m.statusMsg = ""
@@ -159,7 +174,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 		}
 		if m.view == viewSetup {
-			return m, tea.Batch(fetchInstances, fetchKernelStatus, fetchImageStatus)
+			return m, tea.Batch(fetchInstances, fetchKernelStatus, fetchImageStatus, fetchSudoStatus)
 		}
 		return m, fetchInstances
 
@@ -198,7 +213,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.prevView = m.view
 		m.view = viewHelp
-		return m, tea.Batch(fetchKernelStatus, fetchImageStatus)
+		return m, tea.Batch(fetchKernelStatus, fetchImageStatus, fetchSudoStatus)
 	}
 
 	// Clear transient messages on any key.
@@ -353,7 +368,7 @@ func (m Model) handleMain(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Setup):
 		m.setupCursor = 0
 		m.view = viewSetup
-		return m, tea.Batch(fetchKernelStatus, fetchImageStatus)
+		return m, tea.Batch(fetchKernelStatus, fetchImageStatus, fetchSudoStatus)
 	case key.Matches(msg, keys.Refresh):
 		m.loading = true
 		return m, fetchInstances
@@ -567,7 +582,7 @@ func (m Model) execSetupAction() (Model, tea.Cmd) {
 			}
 		})
 	case "Refresh":
-		return m, tea.Batch(fetchKernelStatus, fetchImageStatus)
+		return m, tea.Batch(fetchKernelStatus, fetchImageStatus, fetchSudoStatus)
 	}
 	return m, nil
 }
@@ -656,7 +671,7 @@ func (m Model) prereqWarning() string {
 	var issues []string
 	if !m.podmanInstalled {
 		issues = append(issues, "podman not found")
-	} else if container.NeedsSudo() {
+	} else if container.NeedsSudo() && !m.sudoOK {
 		issues = append(issues, "sudo not authenticated")
 	}
 	for _, s := range m.kernelStatus {

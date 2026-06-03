@@ -43,6 +43,25 @@ func NeedsSudo() bool {
 	return os.Getuid() != 0
 }
 
+// SudoAuthenticated returns true if sudo credentials are currently cached.
+// Always returns true when running as root.
+func SudoAuthenticated() bool {
+	if !NeedsSudo() {
+		return true
+	}
+	return exec.Command("sudo", "-n", "true").Run() == nil
+}
+
+// ImageExistsChecked returns (exists, ok). ok is false when the check itself
+// failed (e.g. sudo credentials expired) so callers can avoid resetting state.
+func ImageExistsChecked(image string) (exists, ok bool) {
+	out, err := podmanCmd("images", "-q", image).CombinedOutput()
+	if err != nil {
+		return false, false
+	}
+	return strings.TrimSpace(string(out)) != "", true
+}
+
 // PodmanInstalled returns true if podman is found on PATH.
 func PodmanInstalled() bool {
 	_, err := exec.LookPath("podman")
@@ -154,10 +173,11 @@ func Spawn(opts SpawnOpts) error {
 	}
 	args = append(args, "x11droid:latest")
 
-	cmd := podmanCmd(args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	out, err := podmanCmd(args...).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("podman run: %w\n%s", err, out)
+	}
+	return nil
 }
 
 func Start(name string) error {
