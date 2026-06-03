@@ -517,10 +517,12 @@ func (m Model) execSetupAction() (Model, tea.Cmd) {
 			func(err error) tea.Msg { return actionDoneMsg{err} },
 		)
 	case "Build Image":
-		return m, tea.ExecProcess(
-			container.BuildImageCmd(),
-			func(err error) tea.Msg { return actionDoneMsg{err} },
-		)
+		cmd, err := container.BuildImageCmd()
+		if err != nil {
+			m.err = err
+			return m, nil
+		}
+		return m, tea.ExecProcess(cmd, func(err error) tea.Msg { return actionDoneMsg{err} })
 	case "Refresh":
 		return m, tea.Batch(fetchKernelStatus, fetchImageStatus)
 	}
