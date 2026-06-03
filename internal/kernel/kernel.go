@@ -2,7 +2,6 @@ package kernel
 
 import (
 	"os"
-	"os/exec"
 	"strings"
 )
 
@@ -47,8 +46,6 @@ func Status() []ModuleStatus {
 		state := StateOptional
 		if loaded[m] {
 			state = StateLoaded
-		} else if moduleExists(m) {
-			state = StateMissing
 		}
 		out = append(out, ModuleStatus{Name: m, State: state, Required: false})
 	}
@@ -85,12 +82,3 @@ func loadedModules() map[string]bool {
 	return out
 }
 
-// moduleExists checks whether a module is available to load (present in
-// /lib/modules but not necessarily loaded).
-func moduleExists(name string) bool {
-	out, err := exec.Command("modinfo", "-n", name).CombinedOutput()
-	if err != nil {
-		return false
-	}
-	return strings.TrimSpace(string(out)) != ""
-}
