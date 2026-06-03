@@ -28,6 +28,10 @@ type errMsg struct{ err error }
 type instancesMsg []container.Instance
 type logsMsg string
 type actionDoneMsg struct{ err error }
+type buildDoneMsg struct {
+	buildErr    error
+	imageExists bool
+}
 type kernelStatusMsg []kernel.ModuleStatus
 type imageStatusMsg bool
 
@@ -136,6 +140,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.prereqsChecked = true
 		return m, nil
 
+	case buildDoneMsg:
+		if msg.buildErr != nil {
+			m.err = msg.buildErr
+			m.statusMsg = ""
+		} else if msg.imageExists {
+			m.statusMsg = "image built successfully"
+			m.imageExists = true
+		} else {
+			m.err = &simpleErr{"build exited cleanly but image not found — check logs"}
+			m.statusMsg = ""
+		}
+		return m, fetchKernelStatus
+
 	case actionDoneMsg:
 		m.statusMsg = ""
 		if msg.err != nil {
@@ -184,10 +201,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(fetchKernelStatus, fetchImageStatus)
 	}
 
-	// Clear error on any key.
-	if m.err != nil {
-		m.err = nil
-	}
+	// Clear transient messages on any key.
+	m.err = nil
+	m.statusMsg = ""
 
 	switch m.view {
 	case viewMain:
@@ -544,7 +560,12 @@ func (m Model) execSetupAction() (Model, tea.Cmd) {
 			m.err = err
 			return m, nil
 		}
-		return m, tea.ExecProcess(cmd, func(err error) tea.Msg { return actionDoneMsg{err} })
+		return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
+			return buildDoneMsg{
+				buildErr:    err,
+				imageExists: container.ImageExists("x11droid:latest"),
+			}
+		})
 	case "Refresh":
 		return m, tea.Batch(fetchKernelStatus, fetchImageStatus)
 	}
