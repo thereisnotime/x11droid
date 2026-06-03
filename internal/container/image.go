@@ -1,7 +1,6 @@
 package container
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -32,14 +31,9 @@ func containerfilePath() string {
 	return "."
 }
 
-func BuildImage() error {
+// BuildImageCmd returns the podman build command ready to be handed to
+// tea.ExecProcess so the TUI suspends and build output is fully visible.
+func BuildImageCmd() *exec.Cmd {
 	dir := containerfilePath()
-	fmt.Printf("Building x11droid:latest from %s ...\n", dir)
-	cmd := exec.Command("podman", "build", "-t", "x11droid:latest", dir)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("podman build: %w", err)
-	}
-	return nil
+	return exec.Command("podman", "build", "-t", "x11droid:latest", dir)
 }
