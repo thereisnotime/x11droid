@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -22,8 +23,40 @@ type podmanPS struct {
 	Image  string   `json:"Image"`
 }
 
+// podmanCmd wraps podman with sudo -n (non-interactive) when running as a
+// non-root user. Use SudoAuth() via tea.ExecProcess first to cache credentials.
+func podmanCmd(args ...string) *exec.Cmd {
+	if os.Getuid() != 0 {
+		return exec.Command("sudo", append([]string{"-n", "podman"}, args...)...)
+	}
+	return exec.Command("podman", args...)
+}
+
+// SudoAuthCmd returns a command that prompts for sudo password interactively.
+// Pass it to tea.ExecProcess to warm up the credentials cache.
+func SudoAuthCmd() *exec.Cmd {
+	return exec.Command("sudo", "-v")
+}
+
+// NeedsSudo returns true when podman commands require sudo.
+func NeedsSudo() bool {
+	return os.Getuid() != 0
+}
+
+// PodmanInstalled returns true if podman is found on PATH.
+func PodmanInstalled() bool {
+	_, err := exec.LookPath("podman")
+	return err == nil
+}
+
+// instanceDataDir returns the persistent data directory for a named instance.
+func instanceDataDir(name string) string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".config", "x11droid", "instances", name)
+}
+
 func List() ([]Instance, error) {
-	out, err := exec.Command("podman", "ps", "-a",
+	out, err := podmanCmd("ps", "-a",
 		"--filter", "label=x11droid=true",
 		"--format", "json",
 	).Output()
@@ -31,7 +64,8 @@ func List() ([]Instance, error) {
 		return nil, fmt.Errorf("podman ps: %w", err)
 	}
 
-	if strings.TrimSpace(string(out)) == "" || strings.TrimSpace(string(out)) == "null" {
+	s := strings.TrimSpace(string(out))
+	if s == "" || s == "null" || s == "[]" {
 		return nil, nil
 	}
 
@@ -56,7 +90,15 @@ func List() ([]Instance, error) {
 	return instances, nil
 }
 
-func Spawn(name string, gapps bool) error {
+// SpawnOpts holds the configuration for a new instance.
+type SpawnOpts struct {
+	Name    string
+	GApps   bool
+	HideARM bool // install libndk ARM translation layer
+	PV      bool // use persistent volume for waydroid data
+}
+
+func Spawn(opts SpawnOpts) error {
 	display := os.Getenv("DISPLAY")
 	if display == "" {
 		display = ":0"
@@ -65,32 +107,57 @@ func Spawn(name string, gapps bool) error {
 	if xdgRuntime == "" {
 		xdgRuntime = fmt.Sprintf("/run/user/%d", os.Getuid())
 	}
+	xauth := os.Getenv("XAUTHORITY")
+	if xauth == "" {
+		home, _ := os.UserHomeDir()
+		xauth = filepath.Join(home, ".Xauthority")
+	}
 
 	args := []string{
 		"run", "-d",
-		"--name", name,
+		"--name", opts.Name,
 		"--label", "x11droid=true",
 		"--privileged",
 		"--device", "/dev/binder",
+		"--network=host",
 		"-e", fmt.Sprintf("DISPLAY=%s", display),
-		"-v", "/tmp/.X11-unix:/tmp/.X11-unix",
-		"-v", fmt.Sprintf("%s:%s", xdgRuntime, xdgRuntime),
 		"-e", fmt.Sprintf("XDG_RUNTIME_DIR=%s", xdgRuntime),
 		"-e", "WAYLAND_DISPLAY=wayland-0",
+		"-v", "/tmp/.X11-unix:/tmp/.X11-unix",
+		"-v", fmt.Sprintf("%s:%s", xdgRuntime, xdgRuntime),
 	}
-	if gapps {
+
+	if opts.PV {
+		dataDir := instanceDataDir(opts.Name)
+		if err := os.MkdirAll(dataDir, 0755); err != nil {
+			return fmt.Errorf("create data dir: %w", err)
+		}
+		args = append(args, "-v", fmt.Sprintf("%s:/var/lib/waydroid", dataDir))
+	}
+
+	if _, err := os.Stat(xauth); err == nil {
+		args = append(args,
+			"-e", fmt.Sprintf("XAUTHORITY=%s", xauth),
+			"-v", fmt.Sprintf("%s:%s:ro", xauth, xauth),
+		)
+	}
+
+	if opts.GApps {
 		args = append(args, "-e", "WAYDROID_GAPPS=1")
 	}
-	args = append(args, "x11droid:latest", "/usr/bin/waydroid-session.sh")
+	if opts.HideARM {
+		args = append(args, "-e", "WAYDROID_HIDEARM=1")
+	}
+	args = append(args, "x11droid:latest")
 
-	cmd := exec.Command("podman", args...)
+	cmd := podmanCmd(args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
 
 func Start(name string) error {
-	out, err := exec.Command("podman", "start", name).CombinedOutput()
+	out, err := podmanCmd("start", name).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("podman start %s: %w\n%s", name, err, out)
 	}
@@ -98,7 +165,7 @@ func Start(name string) error {
 }
 
 func Stop(name string) error {
-	out, err := exec.Command("podman", "stop", name).CombinedOutput()
+	out, err := podmanCmd("stop", name).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("podman stop %s: %w\n%s", name, err, out)
 	}
@@ -106,23 +173,15 @@ func Stop(name string) error {
 }
 
 func Remove(name string) error {
-	out, err := exec.Command("podman", "rm", "-f", name).CombinedOutput()
+	out, err := podmanCmd("rm", "-f", name).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("podman rm %s: %w\n%s", name, err, out)
 	}
 	return nil
 }
 
-func Exec(name, command string) error {
-	cmd := exec.Command("podman", "exec", "-it", name, "bash", "-c", command)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
-
 func Logs(name string) (string, error) {
-	out, err := exec.Command("podman", "logs", "--tail", "100", name).CombinedOutput()
+	out, err := podmanCmd("logs", "--tail", "200", name).CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("podman logs %s: %w", name, err)
 	}
@@ -130,7 +189,7 @@ func Logs(name string) (string, error) {
 }
 
 func ImageExists(image string) bool {
-	out, err := exec.Command("podman", "images", "-q", image).Output()
+	out, err := podmanCmd("images", "-q", image).Output()
 	if err != nil {
 		return false
 	}

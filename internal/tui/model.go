@@ -55,15 +55,19 @@ type Model struct {
 	logs         string
 	showLogs     bool
 
-	// spawn view
-	spawnInput  textinput.Model
-	spawnGApps  bool
-	spawnCursor int // 0=name, 1=gapps, 2=submit
+	// spawn view — cursor: 0=name 1=gapps 2=hidearm 3=pv 4=submit
+	spawnInput   textinput.Model
+	spawnGApps   bool
+	spawnHideARM bool
+	spawnPV      bool
+	spawnCursor  int
 
 	// setup view
-	kernelStatus []kernel.ModuleStatus
-	imageExists  bool
-	setupCursor  int
+	kernelStatus    []kernel.ModuleStatus
+	imageExists     bool
+	setupCursor     int
+	podmanInstalled bool
+	prereqsChecked  bool
 }
 
 func newSpawnInput() textinput.Model {
@@ -77,10 +81,11 @@ func newSpawnInput() textinput.Model {
 
 func New(sess system.Info) Model {
 	return Model{
-		view:       viewMain,
-		loading:    true,
-		session:    sess,
-		spawnInput: newSpawnInput(),
+		view:            viewMain,
+		loading:         true,
+		session:         sess,
+		spawnInput:      newSpawnInput(),
+		podmanInstalled: container.PodmanInstalled(),
 	}
 }
 
@@ -144,6 +149,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case imageStatusMsg:
 		m.imageExists = bool(msg)
+		m.prereqsChecked = true
 		return m, nil
 
 	case actionDoneMsg:
@@ -295,17 +301,24 @@ func (m Model) handleMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case viewSpawn:
-		// name field at ~y4, gapps at ~y7, spawn button at ~y10
+		// name~y4, gapps~y7, hidearm~y10, persist~y13, spawn~y16
+		prev := m.spawnCursor
 		switch {
 		case y >= 3 && y <= 5:
 			m.spawnCursor = 0
-			m.spawnInput.Focus()
 		case y >= 6 && y <= 8:
-			m.spawnInput.Blur()
 			m.spawnCursor = 1
 		case y >= 9 && y <= 11:
-			m.spawnInput.Blur()
 			m.spawnCursor = 2
+		case y >= 12 && y <= 14:
+			m.spawnCursor = 3
+		case y >= 15 && y <= 17:
+			m.spawnCursor = 4
+		}
+		if m.spawnCursor == 0 && prev != 0 {
+			m.spawnInput.Focus()
+		} else if m.spawnCursor != 0 && prev == 0 {
+			m.spawnInput.Blur()
 		}
 	}
 	return m, nil
@@ -333,6 +346,8 @@ func (m Model) handleMain(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.spawnInput = newSpawnInput()
 		m.spawnInput.Focus()
 		m.spawnGApps = false
+		m.spawnHideARM = false
+		m.spawnPV = true
 		m.spawnCursor = 0
 		m.view = viewSpawn
 	case key.Matches(msg, keys.Setup):
@@ -406,6 +421,8 @@ func (m Model) execDetailAction() (Model, tea.Cmd) {
 	return m, nil
 }
 
+const spawnFields = 5 // name, gapps, hidearm, pv, submit
+
 func (m Model) handleSpawn(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keys.Esc):
@@ -414,7 +431,7 @@ func (m Model) handleSpawn(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, keys.Tab), key.Matches(msg, keys.Down):
-		m.spawnCursor = (m.spawnCursor + 1) % 3
+		m.spawnCursor = (m.spawnCursor + 1) % spawnFields
 		if m.spawnCursor == 0 {
 			m.spawnInput.Focus()
 		} else {
@@ -423,7 +440,7 @@ func (m Model) handleSpawn(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, keys.Up):
-		m.spawnCursor = (m.spawnCursor + 2) % 3
+		m.spawnCursor = (m.spawnCursor + spawnFields - 1) % spawnFields
 		if m.spawnCursor == 0 {
 			m.spawnInput.Focus()
 		} else {
@@ -432,27 +449,36 @@ func (m Model) handleSpawn(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, keys.Space):
-		if m.spawnCursor == 1 {
+		switch m.spawnCursor {
+		case 1:
 			m.spawnGApps = !m.spawnGApps
+		case 2:
+			m.spawnHideARM = !m.spawnHideARM
+		case 3:
+			m.spawnPV = !m.spawnPV
 		}
 		return m, nil
 
 	case key.Matches(msg, keys.Enter):
-		if m.spawnCursor == 2 {
+		if m.spawnCursor == spawnFields-1 {
 			name := strings.TrimSpace(m.spawnInput.Value())
 			if name == "" {
 				m.err = &simpleErr{"instance name cannot be empty"}
 				return m, nil
 			}
-			gapps := m.spawnGApps
+			opts := container.SpawnOpts{
+				Name:    name,
+				GApps:   m.spawnGApps,
+				HideARM: m.spawnHideARM,
+				PV:      m.spawnPV,
+			}
 			m.spawnInput.Blur()
 			m.statusMsg = "Spawning..."
 			m.view = viewMain
 			return m, func() tea.Msg {
-				return actionDoneMsg{container.Spawn(name, gapps)}
+				return actionDoneMsg{container.Spawn(opts)}
 			}
 		}
-		// enter on name field moves to next
 		if m.spawnCursor == 0 {
 			m.spawnCursor = 1
 			m.spawnInput.Blur()
@@ -460,7 +486,6 @@ func (m Model) handleSpawn(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// route remaining keys to textinput when on name field
 	if m.spawnCursor == 0 {
 		var cmd tea.Cmd
 		m.spawnInput, cmd = m.spawnInput.Update(msg)
@@ -484,7 +509,15 @@ func sudoCmd(shellCmd string) *exec.Cmd {
 	return cmd
 }
 
-var setupActions = []string{"Load Modules", "Unload Modules", "Build Image", "Refresh"}
+func setupActionList() []string {
+	actions := []string{"Load Modules", "Unload Modules", "Build Image", "Refresh"}
+	if container.NeedsSudo() {
+		actions = append([]string{"Authenticate sudo"}, actions...)
+	}
+	return actions
+}
+
+var setupActions = setupActionList()
 
 func (m Model) handleSetup(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
@@ -506,6 +539,11 @@ func (m Model) handleSetup(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) execSetupAction() (Model, tea.Cmd) {
 	switch setupActions[m.setupCursor] {
+	case "Authenticate sudo":
+		return m, tea.ExecProcess(
+			container.SudoAuthCmd(),
+			func(err error) tea.Msg { return actionDoneMsg{err} },
+		)
 	case "Load Modules":
 		return m, tea.ExecProcess(
 			sudoCmd("modprobe binder_linux; modprobe ashmem_linux 2>/dev/null || true"),
@@ -591,6 +629,29 @@ func (m Model) renderBody() string {
 		return renderHelp(m)
 	}
 	return ""
+}
+
+// prereqWarning returns a non-empty string when required setup is incomplete.
+func (m Model) prereqWarning() string {
+	if !m.prereqsChecked {
+		return ""
+	}
+	var issues []string
+	if !m.podmanInstalled {
+		issues = append(issues, "podman not found")
+	}
+	for _, s := range m.kernelStatus {
+		if s.Required && !s.OK() {
+			issues = append(issues, s.Name+" not loaded")
+		}
+	}
+	if !m.imageExists {
+		issues = append(issues, "image not built")
+	}
+	if len(issues) == 0 {
+		return ""
+	}
+	return strings.Join(issues, " · ") + " — press s to open Setup"
 }
 
 type simpleErr struct{ msg string }

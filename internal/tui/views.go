@@ -28,6 +28,19 @@ func renderMain(m Model) string {
 		sb.WriteString("\n")
 	}
 
+	if pw := m.prereqWarning(); pw != "" {
+		banner := lipgloss.NewStyle().
+			Foreground(colorRed).
+			Background(lipgloss.Color("#2d0000")).
+			Border(lipgloss.NormalBorder(), false, false, false, true).
+			BorderForeground(colorRed).
+			Padding(0, 2).
+			Width(m.width - 4).
+			Render("✖  " + pw)
+		sb.WriteString(lipgloss.NewStyle().Padding(1, 2).Render(banner))
+		sb.WriteString("\n")
+	}
+
 	sb.WriteString(lipgloss.NewStyle().Padding(1, 2).Bold(true).Foreground(colorSubtext).Render(
 		fmt.Sprintf("Instances (%d)", len(m.instances)),
 	))
@@ -124,13 +137,33 @@ func renderLogs(m Model) string {
 
 func renderSpawn(m Model) string {
 	pad := lipgloss.NewStyle().Padding(0, 3)
-	label := lipgloss.NewStyle().Foreground(colorSubtext).Width(8)
+	label := lipgloss.NewStyle().Foreground(colorSubtext).Width(10)
+
+	toggle := func(on bool, cursor, idx int, name, hint string) string {
+		val := "[ ] off"
+		if on {
+			val = "[x] on "
+		}
+		text := val
+		if hint != "" {
+			text = val + "  " + lipgloss.NewStyle().Foreground(colorMuted).Render(hint)
+		}
+		if cursor == idx {
+			return pad.Render(lipgloss.JoinHorizontal(lipgloss.Center,
+				label.Render(name), styleActionSelected.Render(" "+val+" "),
+				lipgloss.NewStyle().Foreground(colorMuted).Render("  "+hint)))
+		}
+		_ = text
+		return pad.Render(lipgloss.JoinHorizontal(lipgloss.Center,
+			label.Render(name), styleAction.Foreground(colorSubtext).Render(" "+val+" "),
+			lipgloss.NewStyle().Foreground(colorMuted).Render("  "+hint)))
+	}
 
 	var sb strings.Builder
 	sb.WriteString(lipgloss.NewStyle().Padding(1, 2).Bold(true).Foreground(colorSubtext).Render("New Instance"))
 	sb.WriteString("\n\n")
 
-	// Name field — textinput renders a clean single line.
+	// Name
 	inputView := m.spawnInput.View()
 	if m.spawnCursor == 0 {
 		inputView = styleInputFocused.Render(inputView)
@@ -140,23 +173,15 @@ func renderSpawn(m Model) string {
 	sb.WriteString(pad.Render(lipgloss.JoinHorizontal(lipgloss.Center, label.Render("Name"), inputView)))
 	sb.WriteString("\n\n")
 
-	// GApps toggle.
-	gappsVal := "[ ] off"
-	if m.spawnGApps {
-		gappsVal = "[x] on "
-	}
-	var gappsWidget string
-	if m.spawnCursor == 1 {
-		gappsWidget = styleActionSelected.Render(" " + gappsVal + " ")
-	} else {
-		gappsWidget = styleAction.Foreground(colorSubtext).Render(" " + gappsVal + " ")
-	}
-	sb.WriteString(pad.Render(lipgloss.JoinHorizontal(lipgloss.Center, label.Render("GApps"), gappsWidget)))
+	sb.WriteString(toggle(m.spawnGApps, m.spawnCursor, 1, "GApps", "Google Play Store"))
+	sb.WriteString("\n\n")
+	sb.WriteString(toggle(m.spawnHideARM, m.spawnCursor, 2, "HideARM", "libndk ARM translation (install after start)"))
+	sb.WriteString("\n\n")
+	sb.WriteString(toggle(m.spawnPV, m.spawnCursor, 3, "Persist", "keep Android data between container restarts"))
 	sb.WriteString("\n\n")
 
-	// Submit button.
 	var submitBtn string
-	if m.spawnCursor == 2 {
+	if m.spawnCursor == 4 {
 		submitBtn = styleActionSelected.Render("  Spawn  ")
 	} else {
 		submitBtn = styleAction.Foreground(colorSubtext).Render("  Spawn  ")
@@ -267,10 +292,11 @@ func renderHelp(m Model) string {
 	sb.WriteString("\n")
 	sb.WriteString(row("↑ / ↓", "navigate actions"))
 	sb.WriteString(row("enter", "run selected action"))
-	sb.WriteString(row("", "  Load Modules   — sudo modprobe binder_linux"))
-	sb.WriteString(row("", "  Unload Modules — sudo rmmod binder_linux"))
-	sb.WriteString(row("", "  Build Image    — podman build x11droid:latest"))
-	sb.WriteString(row("", "  Refresh        — re-check status"))
+	sb.WriteString(row("", "  Authenticate sudo — cache sudo credentials (15 min)"))
+	sb.WriteString(row("", "  Load Modules      — sudo modprobe binder_linux"))
+	sb.WriteString(row("", "  Unload Modules    — sudo rmmod binder_linux"))
+	sb.WriteString(row("", "  Build Image       — podman build x11droid:latest"))
+	sb.WriteString(row("", "  Refresh           — re-check status"))
 	sb.WriteString("\n")
 
 	// System info

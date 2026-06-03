@@ -29,12 +29,29 @@ RUN curl https://repo.waydro.id | bash && \
 
 RUN printf '#!/bin/bash\n\
 COMPOSITOR="${WAYDROID_COMPOSITOR:-cage}"\n\
+GAPPS="${WAYDROID_GAPPS:-}"\n\
+\n\
 cleanup() {\n\
   trap - EXIT INT TERM HUP\n\
   waydroid session stop 2>/dev/null || true\n\
   killall waydroid cage weston 2>/dev/null || true\n\
 }\n\
 trap cleanup EXIT INT TERM HUP\n\
+\n\
+# First-run initialisation — downloads Android image (~500MB).\n\
+if [ ! -f /var/lib/waydroid/images/system.img ]; then\n\
+  echo "[x11droid] First run: initialising Waydroid (downloads ~500MB)..."\n\
+  if [ -n "$GAPPS" ]; then\n\
+    waydroid init -f -s GAPPS\n\
+  else\n\
+    waydroid init -f\n\
+  fi\n\
+  if [ $? -ne 0 ]; then\n\
+    echo "[x11droid] waydroid init failed — check logs"\n\
+    exit 1\n\
+  fi\n\
+fi\n\
+\n\
 case "$COMPOSITOR" in\n\
   cage)\n\
     cage -s -- waydroid show-full-ui\n\
@@ -71,10 +88,8 @@ func ensureContainerfile() (string, error) {
 		return "", fmt.Errorf("create config dir: %w", err)
 	}
 	dst := filepath.Join(dir, "Containerfile")
-	if _, err := os.Stat(dst); os.IsNotExist(err) {
-		if err := os.WriteFile(dst, []byte(containerfileContent), 0644); err != nil {
-			return "", fmt.Errorf("write Containerfile: %w", err)
-		}
+	if err := os.WriteFile(dst, []byte(containerfileContent), 0644); err != nil {
+		return "", fmt.Errorf("write Containerfile: %w", err)
 	}
 	return dir, nil
 }
