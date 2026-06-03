@@ -83,14 +83,14 @@ var (
 	styleInput = lipgloss.NewStyle().
 			Foreground(colorText).
 			Background(colorSurface).
-			Border(lipgloss.NormalBorder()).
+			Border(lipgloss.NormalBorder(), false, false, true, false).
 			BorderForeground(colorBorder).
 			Padding(0, 1)
 
 	styleInputFocused = lipgloss.NewStyle().
 				Foreground(colorText).
 				Background(colorSurface).
-				Border(lipgloss.NormalBorder()).
+				Border(lipgloss.NormalBorder(), false, false, true, false).
 				BorderForeground(colorAccent).
 				Padding(0, 1)
 )

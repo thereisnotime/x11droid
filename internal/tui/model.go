@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/thereisnotime/x11droid/internal/container"
@@ -48,7 +49,7 @@ type Model struct {
 	showLogs     bool
 
 	// spawn view
-	spawnName   string
+	spawnInput  textinput.Model
 	spawnGApps  bool
 	spawnCursor int // 0=name, 1=gapps, 2=submit
 
@@ -58,11 +59,21 @@ type Model struct {
 	setupCursor  int
 }
 
+func newSpawnInput() textinput.Model {
+	ti := textinput.New()
+	ti.Placeholder = "instance-name"
+	ti.CharLimit = 64
+	ti.Width = 28
+	ti.Prompt = ""
+	return ti
+}
+
 func New(sess system.Info) Model {
 	return Model{
-		view:    viewMain,
-		loading: true,
-		session: sess,
+		view:       viewMain,
+		loading:    true,
+		session:    sess,
+		spawnInput: newSpawnInput(),
 	}
 }
 
@@ -119,6 +130,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		return m.handleKey(msg)
+	}
+
+	// forward non-key messages to textinput (cursor blink etc.)
+	if m.view == viewSpawn && m.spawnCursor == 0 {
+		var cmd tea.Cmd
+		m.spawnInput, cmd = m.spawnInput.Update(msg)
+		return m, cmd
 	}
 
 	return m, nil
@@ -181,7 +199,8 @@ func (m Model) handleMain(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.view = viewDetail
 		}
 	case key.Matches(msg, keys.New):
-		m.spawnName = ""
+		m.spawnInput = newSpawnInput()
+		m.spawnInput.Focus()
 		m.spawnGApps = false
 		m.spawnCursor = 0
 		m.view = viewSpawn
@@ -260,33 +279,62 @@ func (m Model) execDetailAction() (Model, tea.Cmd) {
 func (m Model) handleSpawn(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keys.Esc):
+		m.spawnInput.Blur()
 		m.view = viewMain
+		return m, nil
+
 	case key.Matches(msg, keys.Tab), key.Matches(msg, keys.Down):
 		m.spawnCursor = (m.spawnCursor + 1) % 3
+		if m.spawnCursor == 0 {
+			m.spawnInput.Focus()
+		} else {
+			m.spawnInput.Blur()
+		}
+		return m, nil
+
 	case key.Matches(msg, keys.Up):
 		m.spawnCursor = (m.spawnCursor + 2) % 3
+		if m.spawnCursor == 0 {
+			m.spawnInput.Focus()
+		} else {
+			m.spawnInput.Blur()
+		}
+		return m, nil
+
 	case key.Matches(msg, keys.Space):
 		if m.spawnCursor == 1 {
 			m.spawnGApps = !m.spawnGApps
 		}
+		return m, nil
+
 	case key.Matches(msg, keys.Enter):
 		if m.spawnCursor == 2 {
-			if m.spawnName == "" {
+			name := strings.TrimSpace(m.spawnInput.Value())
+			if name == "" {
 				m.err = &simpleErr{"instance name cannot be empty"}
 				return m, nil
 			}
-			name := m.spawnName
 			gapps := m.spawnGApps
+			m.spawnInput.Blur()
 			m.statusMsg = "Spawning..."
 			m.view = viewMain
 			return m, func() tea.Msg {
 				return actionDoneMsg{container.Spawn(name, gapps)}
 			}
 		}
-	default:
+		// enter on name field moves to next
 		if m.spawnCursor == 0 {
-			m.spawnName = handleTextInput(m.spawnName, msg.String())
+			m.spawnCursor = 1
+			m.spawnInput.Blur()
 		}
+		return m, nil
+	}
+
+	// route remaining keys to textinput when on name field
+	if m.spawnCursor == 0 {
+		var cmd tea.Cmd
+		m.spawnInput, cmd = m.spawnInput.Update(msg)
+		return m, cmd
 	}
 	return m, nil
 }
@@ -314,15 +362,15 @@ func (m Model) handleSetup(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) execSetupAction() (Model, tea.Cmd) {
 	switch setupActions[m.setupCursor] {
 	case "Load Modules":
-		m.statusMsg = "Loading kernel modules..."
-		return m, func() tea.Msg {
-			return actionDoneMsg{kernel.Load()}
-		}
+		return m, tea.ExecProcess(
+			exec.Command("sudo", "modprobe", "binder_linux"),
+			func(err error) tea.Msg { return actionDoneMsg{err} },
+		)
 	case "Unload Modules":
-		m.statusMsg = "Unloading kernel modules..."
-		return m, func() tea.Msg {
-			return actionDoneMsg{kernel.Unload()}
-		}
+		return m, tea.ExecProcess(
+			exec.Command("sudo", "rmmod", "binder_linux"),
+			func(err error) tea.Msg { return actionDoneMsg{err} },
+		)
 	case "Build Image":
 		m.statusMsg = "Building image (this may take a while)..."
 		return m, func() tea.Msg {
@@ -402,20 +450,3 @@ func (m Model) renderBody() string {
 type simpleErr struct{ msg string }
 
 func (e *simpleErr) Error() string { return e.msg }
-
-func handleTextInput(current, input string) string {
-	switch input {
-	case "backspace":
-		if len(current) > 0 {
-			return current[:len(current)-1]
-		}
-		return current
-	case "ctrl+u":
-		return ""
-	default:
-		if len(input) == 1 && input[0] >= 32 && input[0] < 127 {
-			return current + input
-		}
-		return current
-	}
-}

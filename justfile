@@ -8,7 +8,7 @@ default:
     @echo "\033[1;33m BUILD\033[0m"
     @echo "  \033[32mbuild\033[0m          compile the binary"
     @echo "  \033[32mrun\033[0m            build and launch the TUI"
-    @echo "  \033[32minstall\033[0m        install to \$GOPATH/bin"
+    @echo "  \033[32minstall\033[0m        build and copy to ~/.local/bin"
     @echo "  \033[32mclean\033[0m          remove built binary"
     @echo "  \033[32mtidy\033[0m           go mod tidy"
     @echo "  \033[32mvet\033[0m            go vet ./..."
@@ -31,8 +31,9 @@ build:
 run: build
     ./{{binary}}
 
-install:
-    {{go}} install ./cmd/x11droid
+install: build
+    cp {{binary}} ~/.local/bin/{{binary}}
+    @echo "installed to ~/.local/bin/{{binary}}"
 
 tidy:
     {{go}} mod tidy

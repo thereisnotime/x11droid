@@ -123,34 +123,35 @@ func renderLogs(m Model) string {
 }
 
 func renderSpawn(m Model) string {
+	pad := lipgloss.NewStyle().Padding(0, 3)
+	label := lipgloss.NewStyle().Foreground(colorSubtext).Width(8)
+
 	var sb strings.Builder
 	sb.WriteString(lipgloss.NewStyle().Padding(1, 2).Bold(true).Foreground(colorSubtext).Render("New Instance"))
 	sb.WriteString("\n\n")
 
-	// Name field.
-	nameLabel := styleLabel.Render("Name:  ")
-	nameInput := m.spawnName
+	// Name field — textinput renders a clean single line.
+	inputView := m.spawnInput.View()
 	if m.spawnCursor == 0 {
-		nameInput = styleInputFocused.Render(padRight(nameInput+"_", 24))
+		inputView = styleInputFocused.Render(inputView)
 	} else {
-		nameInput = styleInput.Render(padRight(nameInput, 24))
+		inputView = styleInput.Render(inputView)
 	}
-	sb.WriteString(lipgloss.NewStyle().Padding(0, 2).Render(nameLabel + nameInput))
+	sb.WriteString(pad.Render(lipgloss.JoinHorizontal(lipgloss.Center, label.Render("Name"), inputView)))
 	sb.WriteString("\n\n")
 
 	// GApps toggle.
-	gappsLabel := styleLabel.Render("GApps: ")
-	gappsVal := "[ ]"
+	gappsVal := "[ ] off"
 	if m.spawnGApps {
-		gappsVal = "[x]"
+		gappsVal = "[x] on "
 	}
 	var gappsWidget string
 	if m.spawnCursor == 1 {
-		gappsWidget = styleActionSelected.Render(gappsVal + " (space to toggle)")
+		gappsWidget = styleActionSelected.Render(" " + gappsVal + " ")
 	} else {
-		gappsWidget = styleAction.Foreground(colorSubtext).Render(gappsVal + " (space to toggle)")
+		gappsWidget = styleAction.Foreground(colorSubtext).Render(" " + gappsVal + " ")
 	}
-	sb.WriteString(lipgloss.NewStyle().Padding(0, 2).Render(gappsLabel + gappsWidget))
+	sb.WriteString(pad.Render(lipgloss.JoinHorizontal(lipgloss.Center, label.Render("GApps"), gappsWidget)))
 	sb.WriteString("\n\n")
 
 	// Submit button.
@@ -160,7 +161,7 @@ func renderSpawn(m Model) string {
 	} else {
 		submitBtn = styleAction.Foreground(colorSubtext).Render("  Spawn  ")
 	}
-	sb.WriteString(lipgloss.NewStyle().Padding(0, 2).Render(submitBtn))
+	sb.WriteString(pad.Render(lipgloss.JoinHorizontal(lipgloss.Center, label.Render(""), submitBtn)))
 	sb.WriteString("\n")
 
 	return sb.String()
