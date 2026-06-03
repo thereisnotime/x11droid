@@ -593,7 +593,15 @@ func (m Model) renderHeader() string {
 	if m.statusMsg != "" {
 		status = styleInProgress.Render(m.statusMsg)
 	} else if m.err != nil {
-		status = styleError.Render("error: " + m.err.Error())
+		maxErrLen := m.width - lipgloss.Width(left) - 10
+		if maxErrLen < 10 {
+			maxErrLen = 10
+		}
+		errStr := "error: " + m.err.Error()
+		if len(errStr) > maxErrLen {
+			errStr = errStr[:maxErrLen-1] + "…"
+		}
+		status = styleError.Render(errStr)
 	}
 
 	padding := m.width - lipgloss.Width(left) - lipgloss.Width(status)
@@ -639,6 +647,8 @@ func (m Model) prereqWarning() string {
 	var issues []string
 	if !m.podmanInstalled {
 		issues = append(issues, "podman not found")
+	} else if container.NeedsSudo() {
+		issues = append(issues, "sudo not authenticated")
 	}
 	for _, s := range m.kernelStatus {
 		if s.Required && !s.OK() {

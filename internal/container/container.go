@@ -56,11 +56,15 @@ func instanceDataDir(name string) string {
 }
 
 func List() ([]Instance, error) {
-	out, err := podmanCmd("ps", "-a",
+	cmd := podmanCmd("ps", "-a",
 		"--filter", "label=x11droid=true",
 		"--format", "json",
-	).Output()
+	)
+	out, err := cmd.CombinedOutput()
 	if err != nil {
+		if isSudoAuthErr(out) {
+			return nil, nil // not authenticated yet — show empty list, not an error
+		}
 		return nil, fmt.Errorf("podman ps: %w", err)
 	}
 
@@ -189,9 +193,18 @@ func Logs(name string) (string, error) {
 }
 
 func ImageExists(image string) bool {
-	out, err := podmanCmd("images", "-q", image).Output()
+	out, err := podmanCmd("images", "-q", image).CombinedOutput()
 	if err != nil {
 		return false
 	}
 	return strings.TrimSpace(string(out)) != ""
+}
+
+// isSudoAuthErr returns true when the command failed because sudo credentials
+// are not cached — expected when the user hasn't authenticated yet.
+func isSudoAuthErr(out []byte) bool {
+	s := strings.ToLower(string(out))
+	return strings.Contains(s, "sudo") && (strings.Contains(s, "password is required") ||
+		strings.Contains(s, "no password") ||
+		strings.Contains(s, "a password"))
 }
