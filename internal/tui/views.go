@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/thereisnotime/x11droid/internal/kernel"
 )
 
 func renderMain(m Model) string {
@@ -306,7 +305,7 @@ func renderHelp(m Model) string {
 	}
 	sb.WriteString(pad.Render(infoKey.Render("$DISPLAY") + dispStyle.Render(disp)) + "\n")
 
-	for _, mod := range kernel.Status() {
+	for _, mod := range m.kernelStatus {
 		var badge string
 		if mod.Loaded {
 			badge = lipgloss.NewStyle().Foreground(colorGreen).Render("loaded")

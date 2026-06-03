@@ -15,7 +15,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "warning: %s\n", w)
 	}
 
-	p := tea.NewProgram(tui.New(sess), tea.WithAltScreen())
+	p := tea.NewProgram(tui.New(sess), tea.WithAltScreen(), tea.WithMouseCellMotion())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

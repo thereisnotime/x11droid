@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"os"
 	"os/exec"
 	"strings"
 
@@ -27,6 +28,10 @@ type errMsg struct{ err error }
 type instancesMsg []container.Instance
 type logsMsg string
 type actionDoneMsg struct{ err error }
+type systemStatusMsg struct {
+	kernelStatus []kernel.ModuleStatus
+	imageExists  bool
+}
 
 type Model struct {
 	view      view
@@ -89,6 +94,13 @@ func fetchInstances() tea.Msg {
 	return instancesMsg(list)
 }
 
+func fetchSystemStatus() tea.Msg {
+	return systemStatusMsg{
+		kernelStatus: kernel.Status(),
+		imageExists:  container.ImageExists("x11droid:latest"),
+	}
+}
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -116,20 +128,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.showLogs = true
 		return m, nil
 
+	case systemStatusMsg:
+		m.kernelStatus = msg.kernelStatus
+		m.imageExists = msg.imageExists
+		return m, nil
+
 	case actionDoneMsg:
 		m.statusMsg = ""
 		if msg.err != nil {
 			m.err = msg.err
 		}
-		// Refresh setup state if in setup view.
 		if m.view == viewSetup {
-			m.kernelStatus = kernel.Status()
-			m.imageExists = container.ImageExists("x11droid:latest")
+			return m, tea.Batch(fetchInstances, fetchSystemStatus)
 		}
 		return m, fetchInstances
 
 	case tea.KeyMsg:
 		return m.handleKey(msg)
+
+	case tea.MouseMsg:
+		if msg.Button == tea.MouseButtonWheelUp || msg.Button == tea.MouseButtonWheelDown {
+			return m.handleMouseWheel(msg), nil
+		}
+		if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
+			return m.handleMouseClick(msg)
+		}
 	}
 
 	// forward non-key messages to textinput (cursor blink etc.)
@@ -151,11 +174,11 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if key.Matches(msg, keys.Help) {
 		if m.view == viewHelp {
 			m.view = m.prevView
-		} else {
-			m.prevView = m.view
-			m.view = viewHelp
+			return m, nil
 		}
-		return m, nil
+		m.prevView = m.view
+		m.view = viewHelp
+		return m, fetchSystemStatus
 	}
 
 	// Clear error on any key.
@@ -175,6 +198,101 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case viewHelp:
 		if key.Matches(msg, keys.Esc) {
 			m.view = m.prevView
+		}
+	}
+	return m, nil
+}
+
+func (m Model) handleMouseWheel(msg tea.MouseMsg) Model {
+	up := msg.Button == tea.MouseButtonWheelUp
+	switch m.view {
+	case viewMain, viewHelp:
+		if up && m.cursor > 0 {
+			m.cursor--
+		} else if !up && m.cursor < len(m.instances)-1 {
+			m.cursor++
+		}
+	case viewDetail:
+		if up && m.actionCursor > 0 {
+			m.actionCursor--
+		} else if !up && m.actionCursor < len(detailActions)-1 {
+			m.actionCursor++
+		}
+	case viewSetup:
+		if up && m.setupCursor > 0 {
+			m.setupCursor--
+		} else if !up && m.setupCursor < len(setupActions)-1 {
+			m.setupCursor++
+		}
+	case viewSpawn:
+		next := m.spawnCursor
+		if up {
+			next = (m.spawnCursor + 2) % 3
+		} else {
+			next = (m.spawnCursor + 1) % 3
+		}
+		if next == 0 {
+			m.spawnInput.Focus()
+		} else {
+			m.spawnInput.Blur()
+		}
+		m.spawnCursor = next
+	}
+	return m
+}
+
+func (m Model) handleMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	y := msg.Y
+
+	switch m.view {
+	case viewMain:
+		// list items start after: header(1) + instances_header_with_padding(3) + newline(1) = y5
+		// add 4 more if warning is shown
+		offset := 5
+		if m.session.Warning() != "" {
+			offset += 4
+		}
+		idx := y - offset
+		if idx >= 0 && idx < len(m.instances) {
+			m.cursor = idx
+			// double-click equivalent: single click opens detail
+			m.selected = m.instances[m.cursor]
+			m.actionCursor = 0
+			m.showLogs = false
+			m.logs = ""
+			m.view = viewDetail
+		}
+
+	case viewDetail:
+		// actions start after: header(1) + detail_info(7) + actions_label(2) = y10
+		offset := 10
+		idx := y - offset
+		if idx >= 0 && idx < len(detailActions) {
+			m.actionCursor = idx
+			return m.execDetailAction()
+		}
+
+	case viewSetup:
+		offset := 14
+		idx := y - offset
+		if idx >= 0 && idx < len(setupActions) {
+			m.setupCursor = idx
+			nm, cmd := m.execSetupAction()
+			return nm, cmd
+		}
+
+	case viewSpawn:
+		// name field at ~y4, gapps at ~y7, spawn button at ~y10
+		switch {
+		case y >= 3 && y <= 5:
+			m.spawnCursor = 0
+			m.spawnInput.Focus()
+		case y >= 6 && y <= 8:
+			m.spawnInput.Blur()
+			m.spawnCursor = 1
+		case y >= 9 && y <= 11:
+			m.spawnInput.Blur()
+			m.spawnCursor = 2
 		}
 	}
 	return m, nil
@@ -205,10 +323,9 @@ func (m Model) handleMain(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.spawnCursor = 0
 		m.view = viewSpawn
 	case key.Matches(msg, keys.Setup):
-		m.kernelStatus = kernel.Status()
-		m.imageExists = container.ImageExists("x11droid:latest")
 		m.setupCursor = 0
 		m.view = viewSetup
+		return m, fetchSystemStatus
 	case key.Matches(msg, keys.Refresh):
 		m.loading = true
 		return m, fetchInstances
@@ -339,6 +456,21 @@ func (m Model) handleSpawn(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// sudoCmd runs a shell command as root via sudo. It opens /dev/tty directly so
+// sudo's password prompt gets a proper TTY regardless of how bubbletea
+// managed the terminal, then pauses so the user can read the output.
+func sudoCmd(shellCmd string) *exec.Cmd {
+	script := "sudo sh -c '" + shellCmd + "'; echo; printf 'press enter to return...'; read _"
+	cmd := exec.Command("sh", "-c", script)
+	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
+	if err == nil {
+		cmd.Stdin = tty
+		cmd.Stdout = tty
+		cmd.Stderr = tty
+	}
+	return cmd
+}
+
 var setupActions = []string{"Load Modules", "Unload Modules", "Build Image", "Refresh"}
 
 func (m Model) handleSetup(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -363,12 +495,12 @@ func (m Model) execSetupAction() (Model, tea.Cmd) {
 	switch setupActions[m.setupCursor] {
 	case "Load Modules":
 		return m, tea.ExecProcess(
-			exec.Command("sudo", "modprobe", "binder_linux"),
+			sudoCmd("modprobe binder_linux; modprobe ashmem_linux 2>/dev/null || true"),
 			func(err error) tea.Msg { return actionDoneMsg{err} },
 		)
 	case "Unload Modules":
 		return m, tea.ExecProcess(
-			exec.Command("sudo", "rmmod", "binder_linux"),
+			sudoCmd("rmmod ashmem_linux 2>/dev/null || true; rmmod binder_linux 2>/dev/null || true"),
 			func(err error) tea.Msg { return actionDoneMsg{err} },
 		)
 	case "Build Image":
@@ -377,8 +509,7 @@ func (m Model) execSetupAction() (Model, tea.Cmd) {
 			return actionDoneMsg{container.BuildImage()}
 		}
 	case "Refresh":
-		m.kernelStatus = kernel.Status()
-		m.imageExists = container.ImageExists("x11droid:latest")
+		return m, fetchSystemStatus
 	}
 	return m, nil
 }
