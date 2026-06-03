@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/thereisnotime/x11droid/internal/container"
 	"github.com/thereisnotime/x11droid/internal/kernel"
+	"github.com/thereisnotime/x11droid/internal/system"
 )
 
 type view int
@@ -18,6 +19,7 @@ const (
 	viewDetail
 	viewSpawn
 	viewSetup
+	viewHelp
 )
 
 type errMsg struct{ err error }
@@ -27,10 +29,12 @@ type actionDoneMsg struct{ err error }
 
 type Model struct {
 	view      view
+	prevView  view
 	width     int
 	height    int
 	err       error
 	statusMsg string
+	session   system.Info
 
 	// main view
 	instances []container.Instance
@@ -54,10 +58,11 @@ type Model struct {
 	setupCursor  int
 }
 
-func New() Model {
+func New(sess system.Info) Model {
 	return Model{
 		view:    viewMain,
 		loading: true,
+		session: sess,
 	}
 }
 
@@ -124,6 +129,17 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 
+	// ? toggles help from any view
+	if key.Matches(msg, keys.Help) {
+		if m.view == viewHelp {
+			m.view = m.prevView
+		} else {
+			m.prevView = m.view
+			m.view = viewHelp
+		}
+		return m, nil
+	}
+
 	// Clear error on any key.
 	if m.err != nil {
 		m.err = nil
@@ -138,6 +154,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleSpawn(msg)
 	case viewSetup:
 		return m.handleSetup(msg)
+	case viewHelp:
+		if key.Matches(msg, keys.Esc) {
+			m.view = m.prevView
+		}
 	}
 	return m, nil
 }
@@ -331,6 +351,7 @@ func (m Model) renderHeader() string {
 		viewDetail: "Instance",
 		viewSpawn:  "New Instance",
 		viewSetup:  "Setup",
+		viewHelp:   "Help",
 	}
 	title := styleTitle.Render("x11droid")
 	viewName := styleMuted.Render("  /  " + viewNames[m.view])
@@ -353,10 +374,11 @@ func (m Model) renderHeader() string {
 
 func (m Model) renderFooter() string {
 	hints := map[view]string{
-		viewMain:   "↑↓ navigate  enter select  n new  s setup  r refresh  q quit",
-		viewDetail: "↑↓ navigate  enter action  esc back  q quit",
-		viewSpawn:  "tab/↑↓ navigate  space toggle  enter confirm  esc back",
-		viewSetup:  "↑↓ navigate  enter action  esc back  q quit",
+		viewMain:   "↑↓ navigate  enter select  n new  s setup  r refresh  ? help  q quit",
+		viewDetail: "↑↓ navigate  enter action  esc back  ? help  q quit",
+		viewSpawn:  "tab/↑↓ navigate  space toggle  enter confirm  esc back  ? help",
+		viewSetup:  "↑↓ navigate  enter action  esc back  ? help  q quit",
+		viewHelp:   "esc/? back  q quit",
 	}
 	return styleFooter.Width(m.width).Render(hints[m.view])
 }
@@ -371,6 +393,8 @@ func (m Model) renderBody() string {
 		return renderSpawn(m)
 	case viewSetup:
 		return renderSetup(m)
+	case viewHelp:
+		return renderHelp(m)
 	}
 	return ""
 }

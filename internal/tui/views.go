@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/thereisnotime/x11droid/internal/kernel"
 )
 
 func renderMain(m Model) string {
@@ -13,6 +14,20 @@ func renderMain(m Model) string {
 	}
 
 	var sb strings.Builder
+
+	if w := m.session.Warning(); w != "" {
+		warning := lipgloss.NewStyle().
+			Foreground(colorYellow).
+			Background(lipgloss.Color("#2d2000")).
+			Border(lipgloss.NormalBorder(), false, false, false, true).
+			BorderForeground(colorYellow).
+			Padding(0, 2).
+			Width(m.width - 4).
+			Render("⚠  " + w)
+		sb.WriteString(lipgloss.NewStyle().Padding(1, 2).Render(warning))
+		sb.WriteString("\n")
+	}
+
 	sb.WriteString(lipgloss.NewStyle().Padding(1, 2).Bold(true).Foreground(colorSubtext).Render(
 		fmt.Sprintf("Instances (%d)", len(m.instances)),
 	))
@@ -195,6 +210,124 @@ func renderSetup(m Model) string {
 		}
 		sb.WriteString(lipgloss.NewStyle().Padding(0, 2).Render(line))
 		sb.WriteString("\n")
+	}
+
+	return sb.String()
+}
+
+func renderHelp(m Model) string {
+	var sb strings.Builder
+	pad := lipgloss.NewStyle().Padding(0, 2)
+	heading := lipgloss.NewStyle().Bold(true).Foreground(colorAccent).Padding(0, 2)
+	key := lipgloss.NewStyle().Foreground(colorAccent).Width(18)
+	desc := lipgloss.NewStyle().Foreground(colorSubtext)
+
+	row := func(k, d string) string {
+		return pad.Render(key.Render(k) + desc.Render(d)) + "\n"
+	}
+
+	sb.WriteString("\n")
+
+	// Global
+	sb.WriteString(heading.Render("Global"))
+	sb.WriteString("\n")
+	sb.WriteString(row("?", "open / close this help screen"))
+	sb.WriteString(row("q  ctrl+c", "quit"))
+	sb.WriteString(row("esc", "go back / close"))
+	sb.WriteString("\n")
+
+	// Dashboard
+	sb.WriteString(heading.Render("Dashboard"))
+	sb.WriteString("\n")
+	sb.WriteString(row("↑ / ↓  or  k / j", "navigate instance list"))
+	sb.WriteString(row("enter", "open instance detail"))
+	sb.WriteString(row("n", "new instance (spawn form)"))
+	sb.WriteString(row("s", "open setup screen"))
+	sb.WriteString(row("r", "refresh instance list"))
+	sb.WriteString("\n")
+
+	// Instance detail
+	sb.WriteString(heading.Render("Instance Detail"))
+	sb.WriteString("\n")
+	sb.WriteString(row("↑ / ↓  or  k / j", "navigate actions"))
+	sb.WriteString(row("enter", "run selected action"))
+	sb.WriteString(row("", "  Start   — start a stopped container"))
+	sb.WriteString(row("", "  Stop    — stop a running container"))
+	sb.WriteString(row("", "  Remove  — force-remove the container"))
+	sb.WriteString(row("", "  Shell   — open bash inside container"))
+	sb.WriteString(row("", "  Logs    — tail last 100 log lines"))
+	sb.WriteString("\n")
+
+	// Spawn
+	sb.WriteString(heading.Render("New Instance"))
+	sb.WriteString("\n")
+	sb.WriteString(row("tab  /  ↑↓", "move between fields"))
+	sb.WriteString(row("space", "toggle GApps"))
+	sb.WriteString(row("enter", "submit (when Spawn is focused)"))
+	sb.WriteString(row("ctrl+u", "clear name input"))
+	sb.WriteString("\n")
+
+	// Setup
+	sb.WriteString(heading.Render("Setup"))
+	sb.WriteString("\n")
+	sb.WriteString(row("↑ / ↓", "navigate actions"))
+	sb.WriteString(row("enter", "run selected action"))
+	sb.WriteString(row("", "  Load Modules   — sudo modprobe binder_linux"))
+	sb.WriteString(row("", "  Unload Modules — sudo rmmod binder_linux"))
+	sb.WriteString(row("", "  Build Image    — podman build x11droid:latest"))
+	sb.WriteString(row("", "  Refresh        — re-check status"))
+	sb.WriteString("\n")
+
+	// System info
+	sb.WriteString(heading.Render("System"))
+	sb.WriteString("\n")
+	infoKey := lipgloss.NewStyle().Foreground(colorSubtext).Width(20)
+	infoVal := func(v, good, bad string) string {
+		s := lipgloss.NewStyle()
+		if v == good {
+			s = s.Foreground(colorGreen)
+		} else if v == bad || v == "" {
+			s = s.Foreground(colorRed)
+		} else {
+			s = s.Foreground(colorYellow)
+		}
+		return pad.Render(infoKey.Render("session type") + s.Render(v)) + "\n"
+	}
+	sb.WriteString(infoVal(m.session.KindLabel(), "X11", "Wayland"))
+
+	dispStyle := lipgloss.NewStyle().Foreground(colorGreen)
+	if m.session.Display == "" {
+		dispStyle = dispStyle.Foreground(colorRed)
+	}
+	disp := m.session.Display
+	if disp == "" {
+		disp = "(not set)"
+	}
+	sb.WriteString(pad.Render(infoKey.Render("$DISPLAY") + dispStyle.Render(disp)) + "\n")
+
+	for _, mod := range kernel.Status() {
+		var badge string
+		if mod.Loaded {
+			badge = lipgloss.NewStyle().Foreground(colorGreen).Render("loaded")
+		} else {
+			badge = lipgloss.NewStyle().Foreground(colorRed).Render("missing")
+		}
+		sb.WriteString(pad.Render(infoKey.Render(mod.Name) + badge) + "\n")
+	}
+
+	imgStyle := lipgloss.NewStyle()
+	imgLabel := "not built"
+	if m.imageExists {
+		imgStyle = imgStyle.Foreground(colorGreen)
+		imgLabel = "x11droid:latest"
+	} else {
+		imgStyle = imgStyle.Foreground(colorRed)
+	}
+	sb.WriteString(pad.Render(infoKey.Render("container image") + imgStyle.Render(imgLabel)) + "\n")
+
+	if w := m.session.Warning(); w != "" {
+		sb.WriteString("\n")
+		sb.WriteString(pad.Render(lipgloss.NewStyle().Foreground(colorYellow).Render("⚠  " + w)) + "\n")
 	}
 
 	return sb.String()
