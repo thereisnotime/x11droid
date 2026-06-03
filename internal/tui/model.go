@@ -32,6 +32,8 @@ type systemStatusMsg struct {
 	kernelStatus []kernel.ModuleStatus
 	imageExists  bool
 }
+type kernelStatusMsg []kernel.ModuleStatus
+type imageStatusMsg bool
 
 type Model struct {
 	view      view
@@ -101,6 +103,9 @@ func fetchSystemStatus() tea.Msg {
 	}
 }
 
+func fetchKernelStatus() tea.Msg  { return kernelStatusMsg(kernel.Status()) }
+func fetchImageStatus() tea.Msg   { return imageStatusMsg(container.ImageExists("x11droid:latest")) }
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -133,13 +138,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.imageExists = msg.imageExists
 		return m, nil
 
+	case kernelStatusMsg:
+		m.kernelStatus = []kernel.ModuleStatus(msg)
+		return m, nil
+
+	case imageStatusMsg:
+		m.imageExists = bool(msg)
+		return m, nil
+
 	case actionDoneMsg:
 		m.statusMsg = ""
 		if msg.err != nil {
 			m.err = msg.err
 		}
 		if m.view == viewSetup {
-			return m, tea.Batch(fetchInstances, fetchSystemStatus)
+			return m, tea.Batch(fetchInstances, fetchKernelStatus, fetchImageStatus)
 		}
 		return m, fetchInstances
 
@@ -178,7 +191,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.prevView = m.view
 		m.view = viewHelp
-		return m, fetchSystemStatus
+		return m, tea.Batch(fetchKernelStatus, fetchImageStatus)
 	}
 
 	// Clear error on any key.
@@ -325,7 +338,7 @@ func (m Model) handleMain(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Setup):
 		m.setupCursor = 0
 		m.view = viewSetup
-		return m, fetchSystemStatus
+		return m, tea.Batch(fetchKernelStatus, fetchImageStatus)
 	case key.Matches(msg, keys.Refresh):
 		m.loading = true
 		return m, fetchInstances
@@ -509,7 +522,7 @@ func (m Model) execSetupAction() (Model, tea.Cmd) {
 			return actionDoneMsg{container.BuildImage()}
 		}
 	case "Refresh":
-		return m, fetchSystemStatus
+		return m, tea.Batch(fetchKernelStatus, fetchImageStatus)
 	}
 	return m, nil
 }

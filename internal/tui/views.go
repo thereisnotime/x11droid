@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/thereisnotime/x11droid/internal/kernel"
 )
 
 func renderMain(m Model) string {
@@ -175,13 +176,7 @@ func renderSetup(m Model) string {
 	sb.WriteString(lipgloss.NewStyle().Padding(0, 2).Bold(true).Foreground(colorText).Render("Kernel Modules"))
 	sb.WriteString("\n")
 	for _, mod := range m.kernelStatus {
-		var badge string
-		if mod.Loaded {
-			badge = styleRunning.Render("● loaded  ")
-		} else {
-			badge = styleStopped.Render("○ missing ")
-		}
-		sb.WriteString(lipgloss.NewStyle().Padding(0, 3).Render(badge + styleLabel.Render(mod.Name)))
+		sb.WriteString(lipgloss.NewStyle().Padding(0, 3).Render(moduleStateBadge(mod) + styleLabel.Render(mod.Name)))
 		sb.WriteString("\n")
 	}
 	sb.WriteString("\n")
@@ -306,13 +301,7 @@ func renderHelp(m Model) string {
 	sb.WriteString(pad.Render(infoKey.Render("$DISPLAY") + dispStyle.Render(disp)) + "\n")
 
 	for _, mod := range m.kernelStatus {
-		var badge string
-		if mod.Loaded {
-			badge = lipgloss.NewStyle().Foreground(colorGreen).Render("loaded")
-		} else {
-			badge = lipgloss.NewStyle().Foreground(colorRed).Render("missing")
-		}
-		sb.WriteString(pad.Render(infoKey.Render(mod.Name) + badge) + "\n")
+		sb.WriteString(pad.Render(infoKey.Render(mod.Name) + moduleStateBadge(mod)) + "\n")
 	}
 
 	imgStyle := lipgloss.NewStyle()
@@ -331,6 +320,19 @@ func renderHelp(m Model) string {
 	}
 
 	return sb.String()
+}
+
+func moduleStateBadge(mod kernel.ModuleStatus) string {
+	switch mod.State {
+	case kernel.StateLoaded:
+		return styleRunning.Render("● loaded   ")
+	case kernel.StateBuiltIn:
+		return styleRunning.Render("● built-in ")
+	case kernel.StateOptional:
+		return styleMuted.Render("○ built-in ")
+	default:
+		return styleStopped.Render("○ missing  ")
+	}
 }
 
 // helpers
