@@ -7,6 +7,8 @@
 
 A CLI/TUI for running and managing [Waydroid](https://waydro.id) instances inside Podman containers on X11.
 
+> Inspired by [use-waydroid-on-x11](https://github.com/1999AZZAR/use-waydroid-on-x11) by 1999AZZAR.
+
 Each instance is an isolated Podman container with a nested Wayland compositor (cage/weston) that forwards its display back to your X11 session. The host stays clean — only two kernel modules need to be loaded.
 
 ## How it works

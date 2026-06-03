@@ -563,7 +563,7 @@ func (m Model) execSetupAction() (Model, tea.Cmd) {
 		return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
 			return buildDoneMsg{
 				buildErr:    err,
-				imageExists: container.ImageExists("x11droid:latest"),
+				imageExists: err == nil,
 			}
 		})
 	case "Refresh":
@@ -598,15 +598,19 @@ func (m Model) renderHeader() string {
 	if m.statusMsg != "" {
 		status = styleInProgress.Render(m.statusMsg)
 	} else if m.err != nil {
-		maxErrLen := m.width - lipgloss.Width(left) - 10
-		if maxErrLen < 10 {
-			maxErrLen = 10
+		maxErrWidth := m.width - lipgloss.Width(left) - 10
+		if maxErrWidth < 10 {
+			maxErrWidth = 10
 		}
 		errStr := "error: " + m.err.Error()
-		if len(errStr) > maxErrLen {
-			errStr = errStr[:maxErrLen-1] + "…"
+		runes := []rune(errStr)
+		for lipgloss.Width(string(runes)) > maxErrWidth && len(runes) > 1 {
+			runes = runes[:len(runes)-1]
 		}
-		status = styleError.Render(errStr)
+		if lipgloss.Width(string(runes)) < lipgloss.Width(errStr) {
+			runes[len(runes)-1] = '…'
+		}
+		status = styleError.Render(string(runes))
 	}
 
 	padding := m.width - lipgloss.Width(left) - lipgloss.Width(status)
