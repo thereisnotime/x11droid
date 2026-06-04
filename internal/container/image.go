@@ -16,19 +16,22 @@ ENV DEBIAN_FRONTEND=noninteractive \
     WLR_RENDERER=pixman \
     XDG_SESSION_TYPE=x11
 
+# Layer 1 — waydroid (slow download, changes rarely — keep this cached)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl ca-certificates && \
+    curl https://repo.waydro.id | bash && \
+    apt-get install -y --no-install-recommends waydroid && \
+    rm -rf /var/lib/apt/lists/*
+
+# Layer 2 — display stack + tools (faster, add/remove packages here without
+# busting the waydroid cache above)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        curl \
-        ca-certificates \
         python3-pip \
         wl-clipboard \
         cage \
         weston \
         kmod && \
-    rm -rf /var/lib/apt/lists/*
-
-RUN curl https://repo.waydro.id | bash && \
-    apt-get install -y --no-install-recommends waydroid && \
     rm -rf /var/lib/apt/lists/*
 
 RUN printf '#!/bin/bash\n\
