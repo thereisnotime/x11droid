@@ -118,6 +118,9 @@ func Spawn(opts SpawnOpts) error {
 		"-e", fmt.Sprintf("DISPLAY=%s", display),
 		"-e", fmt.Sprintf("XDG_RUNTIME_DIR=%s", xdgRuntime),
 		"-e", "WAYLAND_DISPLAY=wayland-0",
+		"-e", "WLR_BACKENDS=x11",
+		"-e", "WLR_RENDERER=pixman",
+		"-e", "XDG_SESSION_TYPE=x11",
 		"-v", "/tmp/.X11-unix:/tmp/.X11-unix",
 		"-v", fmt.Sprintf("%s:%s", xdgRuntime, xdgRuntime),
 	}

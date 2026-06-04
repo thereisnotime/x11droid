@@ -11,7 +11,10 @@ import (
 // ~/.config/x11droid/ on demand so the binary is self-contained.
 const containerfileContent = `FROM ubuntu:24.04
 
-ENV DEBIAN_FRONTEND=noninteractive
+ENV DEBIAN_FRONTEND=noninteractive \
+    WLR_BACKENDS=x11 \
+    WLR_RENDERER=pixman \
+    XDG_SESSION_TYPE=x11
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -40,16 +43,17 @@ trap cleanup EXIT INT TERM HUP\n\
 \n\
 # First-run initialisation — downloads Android image (~500MB).\n\
 if [ ! -f /var/lib/waydroid/images/system.img ]; then\n\
-  echo "[x11droid] First run: initialising Waydroid (downloads ~500MB)..."\n\
+  echo "[x11droid] First run: initialising Waydroid (this downloads ~500MB, please wait)..."\n\
   if [ -n "$GAPPS" ]; then\n\
     waydroid init -f -s GAPPS\n\
   else\n\
     waydroid init -f\n\
   fi\n\
   if [ $? -ne 0 ]; then\n\
-    echo "[x11droid] waydroid init failed — check logs"\n\
+    echo "[x11droid] waydroid init failed — check logs with: x11droid logs <name>"\n\
     exit 1\n\
   fi\n\
+  echo "[x11droid] Init done, starting UI..."\n\
 fi\n\
 \n\
 case "$COMPOSITOR" in\n\
