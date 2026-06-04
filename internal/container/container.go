@@ -125,6 +125,13 @@ func Spawn(opts SpawnOpts) error {
 		"-v", fmt.Sprintf("%s:%s", xdgRuntime, xdgRuntime),
 	}
 
+	// Inject a fake modprobe so waydroid init doesn't fail looking for it —
+	// binder is already loaded on the host so modprobe just needs to succeed.
+	fakeModprobe := filepath.Join(configDir(), "bin", "modprobe")
+	if err := ensureFakeModprobe(fakeModprobe); err == nil {
+		args = append(args, "-v", fmt.Sprintf("%s:/usr/local/bin/modprobe:ro", fakeModprobe))
+	}
+
 	if opts.PV {
 		dataDir := instanceDataDir(opts.Name)
 		if err := os.MkdirAll(dataDir, 0755); err != nil {

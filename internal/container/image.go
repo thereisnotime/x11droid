@@ -93,6 +93,18 @@ func configDir() string {
 	return filepath.Join(home, ".config", "x11droid")
 }
 
+// ensureFakeModprobe writes a no-op modprobe script so waydroid init succeeds
+// inside the container — binder is already loaded on the host.
+func ensureFakeModprobe(path string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+	if _, err := os.Stat(path); err == nil {
+		return nil // already exists
+	}
+	return os.WriteFile(path, []byte("#!/bin/sh\nexec true\n"), 0755)
+}
+
 // ensureContainerfile writes the embedded Containerfile to
 // ~/.config/x11droid/Containerfile if it does not already exist.
 func ensureContainerfile() (string, error) {
