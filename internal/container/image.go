@@ -23,7 +23,8 @@ RUN apt-get update && \
         python3-pip \
         wl-clipboard \
         cage \
-        weston && \
+        weston \
+        kmod && \
     rm -rf /var/lib/apt/lists/*
 
 RUN curl https://repo.waydro.id | bash && \
