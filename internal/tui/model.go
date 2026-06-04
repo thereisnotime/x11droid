@@ -35,9 +35,8 @@ type buildDoneMsg struct {
 type kernelStatusMsg []kernel.ModuleStatus
 type imageStatusMsg struct {
 	exists bool
-	valid  bool // false when the check failed (e.g. sudo not authenticated)
+	valid  bool // false when the check itself failed
 }
-type sudoStatusMsg bool
 
 type Model struct {
 	view      view
@@ -72,7 +71,6 @@ type Model struct {
 	setupCursor     int
 	podmanInstalled bool
 	prereqsChecked  bool
-	sudoOK          bool
 }
 
 func newSpawnInput() textinput.Model {
@@ -95,7 +93,7 @@ func New(sess system.Info) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(fetchInstances, fetchSudoStatus, fetchImageStatus, fetchKernelStatus)
+	return tea.Batch(fetchInstances, fetchImageStatus, fetchKernelStatus)
 }
 
 func fetchInstances() tea.Msg {
@@ -111,7 +109,6 @@ func fetchImageStatus() tea.Msg {
 	exists, ok := container.ImageExistsChecked("x11droid:latest")
 	return imageStatusMsg{exists: exists, valid: ok}
 }
-func fetchSudoStatus() tea.Msg { return sudoStatusMsg(container.SudoAuthenticated()) }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -151,10 +148,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.prereqsChecked = true
 		return m, nil
 
-	case sudoStatusMsg:
-		m.sudoOK = bool(msg)
-		return m, nil
-
 	case buildDoneMsg:
 		if msg.buildErr != nil {
 			m.err = msg.buildErr
@@ -166,7 +159,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = &simpleErr{"build exited cleanly but image not found — check logs"}
 			m.statusMsg = ""
 		}
-		return m, tea.Batch(fetchKernelStatus, fetchSudoStatus)
+		return m, fetchKernelStatus
 
 	case actionDoneMsg:
 		m.statusMsg = ""
@@ -174,7 +167,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 		}
 		if m.view == viewSetup {
-			return m, tea.Batch(fetchInstances, fetchKernelStatus, fetchImageStatus, fetchSudoStatus)
+			return m, tea.Batch(fetchInstances, fetchKernelStatus, fetchImageStatus)
 		}
 		return m, fetchInstances
 
@@ -213,7 +206,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.prevView = m.view
 		m.view = viewHelp
-		return m, tea.Batch(fetchKernelStatus, fetchImageStatus, fetchSudoStatus)
+		return m, tea.Batch(fetchKernelStatus, fetchImageStatus)
 	}
 
 	// Clear transient messages on any key.
@@ -368,7 +361,7 @@ func (m Model) handleMain(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Setup):
 		m.setupCursor = 0
 		m.view = viewSetup
-		return m, tea.Batch(fetchKernelStatus, fetchImageStatus, fetchSudoStatus)
+		return m, tea.Batch(fetchKernelStatus, fetchImageStatus)
 	case key.Matches(msg, keys.Refresh):
 		m.loading = true
 		return m, fetchInstances
@@ -524,15 +517,7 @@ func sudoCmd(shellCmd string) *exec.Cmd {
 	return cmd
 }
 
-func setupActionList() []string {
-	actions := []string{"Load Modules", "Unload Modules", "Build Image", "Refresh"}
-	if container.NeedsSudo() {
-		actions = append([]string{"Authenticate sudo"}, actions...)
-	}
-	return actions
-}
-
-var setupActions = setupActionList()
+var setupActions = []string{"Load Modules", "Unload Modules", "Build Image", "Refresh"}
 
 func (m Model) handleSetup(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
@@ -554,11 +539,6 @@ func (m Model) handleSetup(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) execSetupAction() (Model, tea.Cmd) {
 	switch setupActions[m.setupCursor] {
-	case "Authenticate sudo":
-		return m, tea.ExecProcess(
-			container.SudoAuthCmd(),
-			func(err error) tea.Msg { return actionDoneMsg{err} },
-		)
 	case "Load Modules":
 		return m, tea.ExecProcess(
 			sudoCmd("modprobe binder_linux; modprobe ashmem_linux 2>/dev/null || true"),
@@ -582,7 +562,7 @@ func (m Model) execSetupAction() (Model, tea.Cmd) {
 			}
 		})
 	case "Refresh":
-		return m, tea.Batch(fetchKernelStatus, fetchImageStatus, fetchSudoStatus)
+		return m, tea.Batch(fetchKernelStatus, fetchImageStatus)
 	}
 	return m, nil
 }
@@ -671,8 +651,6 @@ func (m Model) prereqWarning() string {
 	var issues []string
 	if !m.podmanInstalled {
 		issues = append(issues, "podman not found")
-	} else if container.NeedsSudo() && !m.sudoOK {
-		issues = append(issues, "sudo not authenticated")
 	}
 	for _, s := range m.kernelStatus {
 		if s.Required && !s.OK() {

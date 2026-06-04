@@ -38,8 +38,3 @@ func TestPodmanInstalled(t *testing.T) {
 	// Just verify the function doesn't panic.
 	_ = PodmanInstalled()
 }
-
-func TestNeedsSudo(t *testing.T) {
-	// Just verify the function doesn't panic.
-	_ = NeedsSudo()
-}

@@ -75,6 +75,10 @@ func Load() error {
 			return fmt.Errorf("modprobe %s: %w\n%s", m, err, out)
 		}
 	}
+	// Make /dev/binder world-accessible so rootless podman can use it.
+	if out, err := exec.Command("sudo", "chmod", "0666", "/dev/binder").CombinedOutput(); err != nil {
+		return fmt.Errorf("chmod /dev/binder: %w\n%s", err, out)
+	}
 	return nil
 }
 

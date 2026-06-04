@@ -182,9 +182,9 @@ func cmdSetupStatus() *cobra.Command {
 func cmdSetupAuth() *cobra.Command {
 	return &cobra.Command{
 		Use:   "auth",
-		Short: "Authenticate sudo (cache credentials)",
+		Short: "Authenticate sudo for module loading",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c := container.SudoAuthCmd()
+			c := exec.Command("sudo", "-v")
 			c.Stdin = os.Stdin
 			c.Stdout = os.Stdout
 			c.Stderr = os.Stderr

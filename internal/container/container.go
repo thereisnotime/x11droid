@@ -23,49 +23,25 @@ type podmanPS struct {
 	Image  string   `json:"Image"`
 }
 
-// podmanCmd wraps podman with sudo -n (non-interactive) when running as a
-// non-root user. Use SudoAuth() via tea.ExecProcess first to cache credentials.
+// podmanCmd runs podman rootless. Binder access works because Load() sets
+// /dev/binder permissions to 0666 at module-load time — no sudo needed here.
 func podmanCmd(args ...string) *exec.Cmd {
-	if os.Getuid() != 0 {
-		return exec.Command("sudo", append([]string{"-n", "podman"}, args...)...)
-	}
 	return exec.Command("podman", args...)
-}
-
-// SudoAuthCmd returns a command that prompts for sudo password interactively.
-// Pass it to tea.ExecProcess to warm up the credentials cache.
-func SudoAuthCmd() *exec.Cmd {
-	return exec.Command("sudo", "-v")
-}
-
-// NeedsSudo returns true when podman commands require sudo.
-func NeedsSudo() bool {
-	return os.Getuid() != 0
-}
-
-// SudoAuthenticated returns true if sudo credentials are currently cached.
-// Always returns true when running as root.
-func SudoAuthenticated() bool {
-	if !NeedsSudo() {
-		return true
-	}
-	return exec.Command("sudo", "-n", "true").Run() == nil
-}
-
-// ImageExistsChecked returns (exists, ok). ok is false when the check itself
-// failed (e.g. sudo credentials expired) so callers can avoid resetting state.
-func ImageExistsChecked(image string) (exists, ok bool) {
-	out, err := podmanCmd("images", "-q", image).CombinedOutput()
-	if err != nil {
-		return false, false
-	}
-	return strings.TrimSpace(string(out)) != "", true
 }
 
 // PodmanInstalled returns true if podman is found on PATH.
 func PodmanInstalled() bool {
 	_, err := exec.LookPath("podman")
 	return err == nil
+}
+
+// ImageExistsChecked returns (exists, ok). ok is false if the check itself failed.
+func ImageExistsChecked(image string) (exists, ok bool) {
+	out, err := podmanCmd("images", "-q", image).Output()
+	if err != nil {
+		return false, false
+	}
+	return strings.TrimSpace(string(out)) != "", true
 }
 
 // instanceDataDir returns the persistent data directory for a named instance.
@@ -75,15 +51,11 @@ func instanceDataDir(name string) string {
 }
 
 func List() ([]Instance, error) {
-	cmd := podmanCmd("ps", "-a",
+	out, err := podmanCmd("ps", "-a",
 		"--filter", "label=x11droid=true",
 		"--format", "json",
-	)
-	out, err := cmd.CombinedOutput()
+	).Output()
 	if err != nil {
-		if isSudoAuthErr(out) {
-			return nil, nil // not authenticated yet — show empty list, not an error
-		}
 		return nil, fmt.Errorf("podman ps: %w", err)
 	}
 
@@ -213,7 +185,7 @@ func Logs(name string) (string, error) {
 }
 
 func ImageExists(image string) bool {
-	out, err := podmanCmd("images", "-q", image).CombinedOutput()
+	out, err := podmanCmd("images", "-q", image).Output()
 	if err != nil {
 		return false
 	}
