@@ -208,7 +208,9 @@ func renderLogs(m Model) string {
 	return sb.String()
 }
 
-func renderSpawn(m Model) string {
+// renderSpawn returns the form body and the line index of the focused field so
+// the caller can scroll it into view on short terminals.
+func renderSpawn(m Model) (string, int) {
 	pad := lipgloss.NewStyle().Padding(0, 3)
 	label := lipgloss.NewStyle().Foreground(colorSubtext).Width(10)
 
@@ -233,10 +235,18 @@ func renderSpawn(m Model) string {
 	}
 
 	var sb strings.Builder
+	focusLine := 0
+	mark := func(idx int) {
+		if m.spawnCursor == idx {
+			focusLine = strings.Count(sb.String(), "\n")
+		}
+	}
+
 	sb.WriteString(lipgloss.NewStyle().Padding(1, 2).Bold(true).Foreground(colorSubtext).Render("New Instance"))
 	sb.WriteString("\n\n")
 
 	// Name
+	mark(0)
 	inputView := m.spawnInput.View()
 	if m.spawnCursor == 0 {
 		inputView = styleInputFocused.Render(inputView)
@@ -247,6 +257,7 @@ func renderSpawn(m Model) string {
 	sb.WriteString("\n\n")
 
 	// Device name (Android model)
+	mark(1)
 	devView := m.spawnDevice.View()
 	if m.spawnCursor == 1 {
 		devView = styleInputFocused.Render(devView)
@@ -256,25 +267,35 @@ func renderSpawn(m Model) string {
 	sb.WriteString(pad.Render(lipgloss.JoinHorizontal(lipgloss.Center, label.Render("Device"), devView)))
 	sb.WriteString("\n\n")
 
+	mark(2)
 	sb.WriteString(toggle(m.spawnGApps, m.spawnCursor, 2, "GApps", "Google Play Store"))
 	sb.WriteString("\n\n")
+	mark(3)
 	sb.WriteString(toggle(m.spawnHideARM, m.spawnCursor, 3, "ARM", "libndk ARM translation — needed for GApps (adds minutes to first boot)"))
 	sb.WriteString("\n\n")
+	mark(4)
 	sb.WriteString(toggle(m.spawnFDroid, m.spawnCursor, 4, "F-Droid", "install F-Droid after first boot"))
 	sb.WriteString("\n\n")
+	mark(5)
 	sb.WriteString(toggle(m.spawnAurora, m.spawnCursor, 5, "Aurora", "install Aurora Store after first boot"))
 	sb.WriteString("\n\n")
+	mark(6)
 	sb.WriteString(toggle(m.spawnObtainium, m.spawnCursor, 6, "Obtainium", "install Obtainium after first boot"))
 	sb.WriteString("\n\n")
+	mark(7)
 	sb.WriteString(toggle(m.spawnShelter, m.spawnCursor, 7, "Shelter", "install Shelter after first boot"))
 	sb.WriteString("\n\n")
+	mark(8)
 	sb.WriteString(toggle(m.spawnDevOptions, m.spawnCursor, 8, "Dev Options", "enable Android Developer Options"))
 	sb.WriteString("\n\n")
+	mark(9)
 	sb.WriteString(toggle(m.spawnRoot, m.spawnCursor, 9, "Root", "install Magisk (root) on first boot"))
 	sb.WriteString("\n\n")
+	mark(10)
 	sb.WriteString(toggle(m.spawnPV, m.spawnCursor, 10, "Persist", "keep Android data between container restarts"))
 	sb.WriteString("\n\n")
 
+	mark(11)
 	var submitBtn string
 	if m.spawnCursor == 11 {
 		submitBtn = styleActionSelected.Render("  Spawn  ")
@@ -284,7 +305,7 @@ func renderSpawn(m Model) string {
 	sb.WriteString(pad.Render(lipgloss.JoinHorizontal(lipgloss.Center, label.Render(""), submitBtn)))
 	sb.WriteString("\n")
 
-	return sb.String()
+	return sb.String(), focusLine
 }
 
 func renderSetup(m Model) string {

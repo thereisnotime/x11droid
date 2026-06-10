@@ -827,8 +827,31 @@ func (m Model) View() string {
 	}
 	header := m.renderHeader()
 	footer := m.renderFooter()
-	body := m.renderBody()
+	body, focus := m.renderBody()
+	avail := m.height - lipgloss.Height(header) - lipgloss.Height(footer)
+	body = clipBody(body, focus, avail)
 	return lipgloss.JoinVertical(lipgloss.Left, header, body, footer)
+}
+
+// clipBody windows body to at most height lines, scrolled so the focus line
+// stays visible — so tall views (the spawn form) remain usable on short
+// terminals. Returns body unchanged when it already fits.
+func clipBody(body string, focus, height int) string {
+	if height < 1 {
+		return body
+	}
+	lines := strings.Split(body, "\n")
+	if len(lines) <= height {
+		return body
+	}
+	start := focus - height/2
+	if max := len(lines) - height; start > max {
+		start = max
+	}
+	if start < 0 {
+		start = 0
+	}
+	return strings.Join(lines[start:start+height], "\n")
 }
 
 func (m Model) renderHeader() string {
@@ -883,22 +906,24 @@ func (m Model) renderFooter() string {
 	return styleFooter.Width(m.width).Render(hints[m.view])
 }
 
-func (m Model) renderBody() string {
+// renderBody returns the view body and the line the viewport should keep
+// visible (the focused field for scrollable forms; 0 otherwise).
+func (m Model) renderBody() (string, int) {
 	switch m.view {
 	case viewMain:
-		return renderMain(m)
+		return renderMain(m), 0
 	case viewDetail:
-		return renderDetail(m)
+		return renderDetail(m), 0
 	case viewSpawn:
 		return renderSpawn(m)
 	case viewSetup:
-		return renderSetup(m)
+		return renderSetup(m), 0
 	case viewConfig:
-		return renderConfig(m)
+		return renderConfig(m), 0
 	case viewHelp:
-		return renderHelp(m)
+		return renderHelp(m), 0
 	}
-	return ""
+	return "", 0
 }
 
 // prereqWarning returns a non-empty string when required setup is incomplete.
