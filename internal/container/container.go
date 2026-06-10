@@ -537,20 +537,31 @@ func ShowUI(name string) error {
 	// weston runs with --socket=wl-<name> (per-instance); use that exact name —
 	// globbing the shared XDG_RUNTIME_DIR could grab another instance's socket.
 	sock := "wl-" + name
+	// The weston output window is titled "x11droid - <name> - weston[ - Android v]";
+	// match "x11droid - <name> - " so we don't also grab another instance whose
+	// name is a prefix of this one (e.g. "test" vs "test2").
+	win := "x11droid - " + name + " - "
 	script := `sock="` + sock + `"
+win="` + win + `"
+eval "$(tr '\0' '\n' </proc/1/environ | grep -E '^(DISPLAY|XAUTHORITY|XDG_RUNTIME_DIR|WAYDROID_WIDTH|WAYDROID_HEIGHT)=' | sed 's/^/export /')"
 if ! pgrep -x weston >/dev/null 2>&1 && ! pgrep -x cage >/dev/null 2>&1; then
   # Compositor died — relaunch it with the same display/geometry the entrypoint used.
-  eval "$(tr '\0' '\n' </proc/1/environ | grep -E '^(DISPLAY|XAUTHORITY|XDG_RUNTIME_DIR|WAYDROID_WIDTH|WAYDROID_HEIGHT)=' | sed 's/^/export /')"
   W="${WAYDROID_WIDTH:-540}"; H="${WAYDROID_HEIGHT:-960}"
   weston --backend=x11-backend.so --use-pixman --shell=kiosk-shell.so \
     --socket="$sock" --width="$W" --height="$H" >/tmp/weston.log 2>&1 &
   for _ in $(seq 1 30); do [ -S "$XDG_RUNTIME_DIR/$sock" ] && break; sleep 0.5; done
   [ -S "$XDG_RUNTIME_DIR/$sock" ] || { echo "compositor failed to relaunch:"; tail -5 /tmp/weston.log; exit 1; }
-fi
-export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/dbus/session_bus_socket"
-export WAYLAND_DISPLAY="$sock"
-setsid waydroid show-full-ui >/dev/null 2>&1 </dev/null &
-sleep 1`
+  export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/dbus/session_bus_socket"
+  export WAYLAND_DISPLAY="$sock"
+  setsid waydroid show-full-ui >/dev/null 2>&1 </dev/null &
+  sleep 1
+else
+  # Compositor alive — Hide UI just unmapped the window; re-map and raise it.
+  for w in $(xdotool search --name "$win" 2>/dev/null); do
+    xdotool windowmap "$w" 2>/dev/null || true
+    xdotool windowactivate "$w" 2>/dev/null || true
+  done
+fi`
 	out, err := podmanCmd("exec", name, "bash", "-lc", script).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("show-full-ui %s: %w\n%s", name, err, out)
@@ -558,17 +569,17 @@ sleep 1`
 	return nil
 }
 
-// HideUI closes the Android window without stopping the instance: it stops the
-// waydroid session and kills the compositor, leaving the container manager (and
-// the booted Android system layer) up so ShowUI can bring the window back
-// without a fresh spawn. The container itself stays Up because the entrypoint's
-// supervisor keeps PID 1 alive independent of the compositor.
+// HideUI hides the Android window without touching Android: it just unmaps the
+// weston output window on the host X server. weston and the Android session keep
+// running, so ShowUI re-maps it instantly — no session stop, no black screen, no
+// reboot. (ShowUI still relaunches the compositor if it actually died.)
 func HideUI(name string) error {
-	// pkill (procps), not killall (psmisc) — psmisc isn't installed in the image,
-	// so killall silently fails and weston survives as a black kiosk window.
-	script := `waydroid session stop >/dev/null 2>&1 || true
-pkill -x weston 2>/dev/null || killall weston 2>/dev/null || true
-pkill -x cage 2>/dev/null || killall cage 2>/dev/null || true`
+	win := "x11droid - " + name + " - "
+	script := `win="` + win + `"
+eval "$(tr '\0' '\n' </proc/1/environ | grep -E '^(DISPLAY|XAUTHORITY)=' | sed 's/^/export /')"
+wids="$(xdotool search --name "$win" 2>/dev/null)"
+[ -n "$wids" ] || { echo "no x11droid window found for ` + name + ` (is the UI shown?)"; exit 1; }
+for w in $wids; do xdotool windowunmap "$w" 2>/dev/null || true; done`
 	out, err := podmanCmd("exec", name, "bash", "-lc", script).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("hide-ui %s: %w\n%s", name, err, out)
