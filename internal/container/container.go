@@ -29,22 +29,22 @@ type podmanPS struct {
 	Created int64    `json:"Created"`
 }
 
-// Extras is per-instance info that requires touching the filesystem, fetched
-// on demand for the detail view.
+// Extras is per-instance info fetched on demand for the detail view (touches
+// the filesystem and runs `podman stats`, so it's slower than List).
 type Extras struct {
 	DataDir    string
 	Persistent bool // data dir exists on disk
 	Size       string
-	LibNDK     bool // ARM translation installed
-	Magisk     bool // root installed
-	Apps       bool // app-store bundle installed
+	MemUsage   string // current RAM (used / limit), empty if not running
+	LibNDK     bool   // ARM translation installed
+	Magisk     bool   // root installed
 }
 
-// InstanceExtras reads the instance's persistent data dir for path, size and
-// which one-time installers have run (marker files the entrypoint writes).
+// InstanceExtras gathers the data-dir path/size, current RAM usage, and which
+// one-time system mods are installed (marker files the entrypoint writes).
 func InstanceExtras(name string) Extras {
 	dir := instanceDataDir(name)
-	e := Extras{DataDir: dir}
+	e := Extras{DataDir: dir, MemUsage: memUsage(name)}
 	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
 		return e
 	}
@@ -52,8 +52,17 @@ func InstanceExtras(name string) Extras {
 	e.Size = dirSize(dir)
 	e.LibNDK = fileExists(filepath.Join(dir, ".x11droid-libndk"))
 	e.Magisk = fileExists(filepath.Join(dir, ".x11droid-magisk"))
-	e.Apps = fileExists(filepath.Join(dir, ".x11droid-apps"))
 	return e
+}
+
+// memUsage returns the container's current memory usage ("used / limit"), or
+// "" when it isn't running.
+func memUsage(name string) string {
+	out, err := podmanCmd("stats", "--no-stream", "--format", "{{.MemUsage}}", name).Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }
 
 func fileExists(p string) bool {
@@ -184,7 +193,6 @@ func Spawn(opts SpawnOpts) error {
 	// root's, so DISPLAY/XAUTHORITY/XDG_RUNTIME_DIR must come from SUDO_USER.
 	hu := system.ResolveHostUser()
 	display := hu.Display
-	xdgRuntime := hu.RuntimeDir
 	xauth := hu.XAuthority
 
 	args := []string{
@@ -209,12 +217,14 @@ func Spawn(opts SpawnOpts) error {
 		// Name available to the entrypoint for the weston window title.
 		"-e", fmt.Sprintf("X11DROID_NAME=%s", opts.Name),
 		"-e", fmt.Sprintf("DISPLAY=%s", display),
-		"-e", fmt.Sprintf("XDG_RUNTIME_DIR=%s", xdgRuntime),
+		// Private, container-local runtime dir (the entrypoint creates it) so
+		// each instance's weston wayland socket is isolated — sharing the host
+		// /run/user/<uid> made a second instance hijack the first's compositor.
+		"-e", "XDG_RUNTIME_DIR=/run/xdg",
 		"-e", "WLR_BACKENDS=x11",
 		"-e", "WLR_RENDERER=pixman",
 		"-e", "XDG_SESSION_TYPE=x11",
 		"-v", "/tmp/.X11-unix:/tmp/.X11-unix",
-		"-v", fmt.Sprintf("%s:%s", xdgRuntime, xdgRuntime),
 	}
 
 	// Pass each binder node waydroid needs (binder, hwbinder, vndbinder). These

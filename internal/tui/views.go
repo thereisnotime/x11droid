@@ -18,17 +18,14 @@ func sizeSuffix(s string) string {
 	return ", " + s
 }
 
-// installedBadges renders which one-time installers have run for an instance.
+// installedBadges renders which one-time system mods are installed.
 func installedBadges(ex container.Extras) string {
 	var parts []string
 	if ex.LibNDK {
-		parts = append(parts, styleRunning.Render("ARM"))
+		parts = append(parts, styleRunning.Render("ARM translation"))
 	}
 	if ex.Magisk {
-		parts = append(parts, styleRunning.Render("Magisk"))
-	}
-	if ex.Apps {
-		parts = append(parts, styleRunning.Render("Apps"))
+		parts = append(parts, styleRunning.Render("Magisk (root)"))
 	}
 	if len(parts) == 0 {
 		return styleMuted.Render("none")
@@ -120,6 +117,10 @@ func renderDetail(m Model) string {
 	if created == "" {
 		created = "—"
 	}
+	ram := ex.MemUsage
+	if ram == "" {
+		ram = "—"
+	}
 
 	// Data line: path + persistent/ephemeral + size.
 	data := "…"
@@ -140,6 +141,7 @@ func renderDetail(m Model) string {
 			lbl("ID:")+styleValue.Render(inst.ID),
 			lbl("Image:")+styleValue.Render(inst.Image),
 			lbl("Status:")+statusStyle(inst.Status).Render(inst.Status),
+			lbl("RAM:")+styleValue.Render(ram),
 			lbl("Created:")+styleValue.Render(created),
 			lbl("Data:")+styleValue.Render(data),
 			lbl("Extras:")+installed,

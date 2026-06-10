@@ -16,6 +16,11 @@ X11DROID_NAME="${X11DROID_NAME:-instance}"
 # Android device/model name — explicit override, else the instance name.
 DEVICE_NAME="${WAYDROID_DEVICE:-$X11DROID_NAME}"
 
+# Private runtime dir for weston's wayland socket — created here (owned by root,
+# mode 0700) so weston is happy and instances don't collide on a shared dir.
+mkdir -p "${XDG_RUNTIME_DIR:-/run/xdg}" 2>/dev/null || true
+chmod 700 "${XDG_RUNTIME_DIR:-/run/xdg}" 2>/dev/null || true
+
 cleanup() {
   trap - EXIT INT TERM HUP
   waydroid session stop 2>/dev/null || true

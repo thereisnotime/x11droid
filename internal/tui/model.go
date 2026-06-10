@@ -416,8 +416,8 @@ func (m Model) handleMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	case viewDetail:
 		// Click selects an action (press enter to run it) — never execute on
 		// click, so a mis-mapped click can't fire Remove/Purge by accident.
-		// Actions start at screen y=11 (header bar + 7-line info block + label).
-		idx := y - 11
+		// Actions start at screen y=12 (header bar + 8-line info block + label).
+		idx := y - 12
 		if idx >= 0 && idx < len(detailActions) {
 			m.actionCursor = idx
 		}
