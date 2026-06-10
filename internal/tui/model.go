@@ -51,6 +51,23 @@ type bgInstancesMsg struct {
 	ok   bool
 }
 type bgLogsMsg string
+type extrasMsg container.Extras
+
+func fetchExtras(name string) tea.Cmd {
+	return func() tea.Msg { return extrasMsg(container.InstanceExtras(name)) }
+}
+
+// openDetail sets up the instance detail view for the cursor's instance and
+// returns a command to load its filesystem extras (path/size/installed).
+func (m *Model) openDetail() tea.Cmd {
+	m.selected = m.instances[m.cursor]
+	m.selectedExtras = container.Extras{}
+	m.actionCursor = 0
+	m.showLogs = false
+	m.logs = ""
+	m.view = viewDetail
+	return fetchExtras(m.selected.Name)
+}
 
 type Model struct {
 	view      view
@@ -67,10 +84,11 @@ type Model struct {
 	loading   bool
 
 	// detail view
-	selected     container.Instance
-	actionCursor int
-	logs         string
-	showLogs     bool
+	selected       container.Instance
+	selectedExtras container.Extras
+	actionCursor   int
+	logs           string
+	showLogs       bool
 
 	// spawn view — cursor: 0=name 1=device 2=gapps 3=arm 4=fdroid 5=aurora
 	// 6=obtainium 7=shelter 8=devoptions 9=root 10=pv 11=submit
@@ -195,6 +213,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case logsMsg:
 		m.logs = string(msg)
 		m.showLogs = true
+		return m, nil
+
+	case extrasMsg:
+		m.selectedExtras = container.Extras(msg)
 		return m, nil
 
 	case kernelStatusMsg:
@@ -387,19 +409,15 @@ func (m Model) handleMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		idx := y - offset
 		if idx >= 0 && idx < len(m.instances) {
 			m.cursor = idx
-			// double-click equivalent: single click opens detail
-			m.selected = m.instances[m.cursor]
-			m.actionCursor = 0
-			m.showLogs = false
-			m.logs = ""
-			m.view = viewDetail
+			// single click opens detail
+			return m, m.openDetail()
 		}
 
 	case viewDetail:
 		// Click selects an action (press enter to run it) — never execute on
 		// click, so a mis-mapped click can't fire Remove/Purge by accident.
-		// Actions start at screen y=8 (header bar + detail info block + label).
-		idx := y - 8
+		// Actions start at screen y=11 (header bar + 7-line info block + label).
+		idx := y - 11
 		if idx >= 0 && idx < len(detailActions) {
 			m.actionCursor = idx
 		}
@@ -457,11 +475,7 @@ func (m Model) handleMain(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case key.Matches(msg, keys.Enter):
 		if len(m.instances) > 0 {
-			m.selected = m.instances[m.cursor]
-			m.actionCursor = 0
-			m.showLogs = false
-			m.logs = ""
-			m.view = viewDetail
+			return m, m.openDetail()
 		}
 	case key.Matches(msg, keys.New):
 		m.spawnInput = newSpawnInput()

@@ -7,23 +7,69 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/thereisnotime/x11droid/internal/kernel"
 	"github.com/thereisnotime/x11droid/internal/system"
 )
 
 type Instance struct {
-	Name   string
-	ID     string
-	Status string
-	Image  string
+	Name    string
+	ID      string
+	Status  string
+	Image   string
+	Created string // formatted creation time
 }
 
 type podmanPS struct {
-	ID     string   `json:"Id"`
-	Names  []string `json:"Names"`
-	Status string   `json:"Status"`
-	Image  string   `json:"Image"`
+	ID      string   `json:"Id"`
+	Names   []string `json:"Names"`
+	Status  string   `json:"Status"`
+	Image   string   `json:"Image"`
+	Created int64    `json:"Created"`
+}
+
+// Extras is per-instance info that requires touching the filesystem, fetched
+// on demand for the detail view.
+type Extras struct {
+	DataDir    string
+	Persistent bool // data dir exists on disk
+	Size       string
+	LibNDK     bool // ARM translation installed
+	Magisk     bool // root installed
+	Apps       bool // app-store bundle installed
+}
+
+// InstanceExtras reads the instance's persistent data dir for path, size and
+// which one-time installers have run (marker files the entrypoint writes).
+func InstanceExtras(name string) Extras {
+	dir := instanceDataDir(name)
+	e := Extras{DataDir: dir}
+	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
+		return e
+	}
+	e.Persistent = true
+	e.Size = dirSize(dir)
+	e.LibNDK = fileExists(filepath.Join(dir, ".x11droid-libndk"))
+	e.Magisk = fileExists(filepath.Join(dir, ".x11droid-magisk"))
+	e.Apps = fileExists(filepath.Join(dir, ".x11droid-apps"))
+	return e
+}
+
+func fileExists(p string) bool {
+	_, err := os.Stat(p)
+	return err == nil
+}
+
+func dirSize(dir string) string {
+	out, err := exec.Command("du", "-sh", dir).Output()
+	if err != nil {
+		return ""
+	}
+	if f := strings.Fields(string(out)); len(f) > 0 {
+		return f[0]
+	}
+	return ""
 }
 
 // podmanCmd runs the podman CLI directly. x11droid itself must run as root
@@ -81,11 +127,16 @@ func List() ([]Instance, error) {
 		if len(r.Names) > 0 {
 			name = strings.TrimPrefix(r.Names[0], "/")
 		}
+		created := ""
+		if r.Created > 0 {
+			created = time.Unix(r.Created, 0).Format("2006-01-02 15:04")
+		}
 		instances = append(instances, Instance{
-			Name:   name,
-			ID:     r.ID[:12],
-			Status: r.Status,
-			Image:  r.Image,
+			Name:    name,
+			ID:      r.ID[:12],
+			Status:  r.Status,
+			Image:   r.Image,
+			Created: created,
 		})
 	}
 	return instances, nil

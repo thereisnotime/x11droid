@@ -6,9 +6,35 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/thereisnotime/x11droid/internal/config"
+	"github.com/thereisnotime/x11droid/internal/container"
 	"github.com/thereisnotime/x11droid/internal/kernel"
 	"github.com/thereisnotime/x11droid/internal/version"
 )
+
+func sizeSuffix(s string) string {
+	if s == "" {
+		return ""
+	}
+	return ", " + s
+}
+
+// installedBadges renders which one-time installers have run for an instance.
+func installedBadges(ex container.Extras) string {
+	var parts []string
+	if ex.LibNDK {
+		parts = append(parts, styleRunning.Render("ARM"))
+	}
+	if ex.Magisk {
+		parts = append(parts, styleRunning.Render("Magisk"))
+	}
+	if ex.Apps {
+		parts = append(parts, styleRunning.Render("Apps"))
+	}
+	if len(parts) == 0 {
+		return styleMuted.Render("none")
+	}
+	return strings.Join(parts, "  ")
+}
 
 func renderMain(m Model) string {
 	if m.loading {
@@ -85,14 +111,38 @@ func renderDetail(m Model) string {
 	}
 
 	inst := m.selected
+	ex := m.selectedExtras
 	var sb strings.Builder
+
+	lbl := func(s string) string { return styleLabel.Render(padRight(s, 9)) }
+
+	created := inst.Created
+	if created == "" {
+		created = "—"
+	}
+
+	// Data line: path + persistent/ephemeral + size.
+	data := "…"
+	if ex.DataDir != "" {
+		if ex.Persistent {
+			data = ex.DataDir + "  " + styleMuted.Render("(persistent"+sizeSuffix(ex.Size)+")")
+		} else {
+			data = ex.DataDir + "  " + styleMuted.Render("(ephemeral — no data yet)")
+		}
+	}
+
+	// Installed extras as badges.
+	installed := installedBadges(ex)
 
 	header := lipgloss.NewStyle().Padding(1, 2).Render(
 		lipgloss.JoinVertical(lipgloss.Left,
 			styleValue.Bold(true).Render(inst.Name),
-			styleLabel.Render("ID:     ")+styleValue.Render(inst.ID),
-			styleLabel.Render("Image:  ")+styleValue.Render(inst.Image),
-			styleLabel.Render("Status: ")+statusStyle(inst.Status).Render(inst.Status),
+			lbl("ID:")+styleValue.Render(inst.ID),
+			lbl("Image:")+styleValue.Render(inst.Image),
+			lbl("Status:")+statusStyle(inst.Status).Render(inst.Status),
+			lbl("Created:")+styleValue.Render(created),
+			lbl("Data:")+styleValue.Render(data),
+			lbl("Extras:")+installed,
 		),
 	)
 	sb.WriteString(header)
