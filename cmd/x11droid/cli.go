@@ -63,7 +63,7 @@ func cmdSpawn() *cobra.Command {
 	}
 	c.Flags().BoolVar(&gapps, "gapps", false, "enable Google Play Store")
 	c.Flags().BoolVar(&hidearm, "hidearm", false, "enable libndk ARM translation")
-	c.Flags().BoolVar(&apps, "apps", false, "install F-Droid + Aurora Store after first boot")
+	c.Flags().BoolVar(&apps, "apps", false, "install F-Droid, Aurora, Obtainium, Shelter after first boot")
 	c.Flags().BoolVar(&noPV, "no-pv", false, "disable persistent volume")
 	return c
 }

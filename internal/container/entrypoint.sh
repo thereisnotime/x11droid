@@ -180,6 +180,15 @@ fdroid_install() { # $1 = package id, $2 = friendly name
     || { echo "[x11droid] $name: download failed" >&2; return 1; }
   waydroid app install "$apk" && echo "[x11droid] $name installed"
 }
+github_install() { # $1 = owner/repo, $2 = asset regex, $3 = friendly name
+  local repo="$1" pat="$2" name="$3" url apk
+  url="$(curl -fsSL "https://api.github.com/repos/$repo/releases/latest" 2>/dev/null | grep -oE 'https://[^"]+\.apk' | grep -E "$pat" | head -1)"
+  [ -n "$url" ] || { echo "[x11droid] $name: no matching release asset" >&2; return 1; }
+  apk="/tmp/x11droid-apks/$(basename "$url")"
+  curl -fsSL -o "$apk" "$url" \
+    || { echo "[x11droid] $name: download failed" >&2; return 1; }
+  waydroid app install "$apk" && echo "[x11droid] $name installed"
+}
 install_apps() {
   for _ in $(seq 1 120); do
     [ "$(waydroid prop get sys.boot_completed 2>/dev/null | tr -d '\r ')" = "1" ] && break
@@ -188,6 +197,8 @@ install_apps() {
   mkdir -p /tmp/x11droid-apks
   fdroid_install org.fdroid.fdroid "F-Droid"
   fdroid_install com.aurora.store "Aurora Store"
+  fdroid_install net.typeblog.shelter "Shelter"
+  github_install ImranR98/Obtainium 'app-x86_64-release\.apk$' "Obtainium"
   touch /var/lib/waydroid/.x11droid-apps
 }
 
@@ -218,7 +229,7 @@ title_window() {
 
 # App stores (F-Droid + Aurora) — once, in the background, after Android boots.
 if [ -n "$APPS" ] && [ ! -f /var/lib/waydroid/.x11droid-apps ]; then
-  echo "[x11droid] will install F-Droid + Aurora once Android finishes booting..."
+  echo "[x11droid] will install F-Droid, Aurora, Obtainium, Shelter once Android finishes booting..."
   install_apps >/var/lib/waydroid/x11droid-apps.log 2>&1 &
 fi
 

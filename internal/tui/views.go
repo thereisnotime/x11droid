@@ -198,7 +198,7 @@ func renderSpawn(m Model) string {
 	sb.WriteString("\n\n")
 	sb.WriteString(toggle(m.spawnHideARM, m.spawnCursor, 2, "ARM", "libndk ARM translation — needed for GApps (adds minutes to first boot)"))
 	sb.WriteString("\n\n")
-	sb.WriteString(toggle(m.spawnApps, m.spawnCursor, 3, "App stores", "install F-Droid + Aurora after first boot"))
+	sb.WriteString(toggle(m.spawnApps, m.spawnCursor, 3, "Apps", "install F-Droid, Aurora, Obtainium, Shelter after first boot"))
 	sb.WriteString("\n\n")
 	sb.WriteString(toggle(m.spawnPV, m.spawnCursor, 4, "Persist", "keep Android data between container restarts"))
 	sb.WriteString("\n\n")
