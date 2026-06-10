@@ -297,10 +297,12 @@ func ShowUI(name string) error {
 	// A `podman exec` gets a fresh env, so re-point it at the same session bus
 	// the entrypoint started (otherwise waydroid tries dbus-launch and fails)
 	// and rediscover the compositor's wayland socket (weston-N or cage).
+	// show-full-ui blocks for as long as the UI is open, so run it detached
+	// (-d) — otherwise the caller hangs waiting for it to return.
 	script := `export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/dbus/session_bus_socket"; ` +
 		`export WAYLAND_DISPLAY="$(basename "$(ls "$XDG_RUNTIME_DIR"/wayland-[0-9]* 2>/dev/null | head -1)")"; ` +
-		`waydroid show-full-ui`
-	out, err := podmanCmd("exec", name, "bash", "-lc", script).CombinedOutput()
+		`exec waydroid show-full-ui`
+	out, err := podmanCmd("exec", "-d", name, "bash", "-lc", script).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("show-full-ui %s: %w\n%s", name, err, out)
 	}
