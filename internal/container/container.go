@@ -316,15 +316,19 @@ func Running() ([]Instance, error) {
 // ShowUI (re)opens the Android UI window for a running instance by asking
 // waydroid to show the full UI on the compositor already running inside it.
 func ShowUI(name string) error {
-	// A `podman exec` gets a fresh env, so re-point it at the same session bus
-	// the entrypoint started (otherwise waydroid tries dbus-launch and fails)
-	// and rediscover the compositor's wayland socket (weston-N or cage).
-	// show-full-ui blocks for as long as the UI is open, so run it detached
-	// (-d) — otherwise the caller hangs waiting for it to return.
-	script := `export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/dbus/session_bus_socket"; ` +
-		`export WAYLAND_DISPLAY="$(basename "$(ls "$XDG_RUNTIME_DIR"/wayland-[0-9]* 2>/dev/null | head -1)")"; ` +
-		`exec waydroid show-full-ui`
-	out, err := podmanCmd("exec", "-d", name, "bash", "-lc", script).CombinedOutput()
+	// Show-full-ui renders into the running compositor; if it died (e.g. the
+	// window was closed) there's nothing to show into, so fail with a clear
+	// message instead of silently doing nothing. Re-point the fresh exec env at
+	// the entrypoint's session bus and the compositor's wayland socket, then
+	// background show-full-ui (it blocks while the UI is open) via setsid so it
+	// survives the exec returning.
+	script := `pgrep -x weston >/dev/null 2>&1 || pgrep -x cage >/dev/null 2>&1 || ` +
+		`{ echo "compositor is not running — Stop then Start (or respawn) this instance"; exit 1; }
+export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/dbus/session_bus_socket"
+export WAYLAND_DISPLAY="$(basename "$(ls "$XDG_RUNTIME_DIR"/wayland-[0-9]* 2>/dev/null | head -1)")"
+setsid waydroid show-full-ui >/dev/null 2>&1 </dev/null &
+sleep 1`
+	out, err := podmanCmd("exec", name, "bash", "-lc", script).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("show-full-ui %s: %w\n%s", name, err, out)
 	}

@@ -390,21 +390,18 @@ func (m Model) handleMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case viewDetail:
-		// actions start after: header(1) + detail_info(7) + actions_label(2) = y10
-		offset := 10
-		idx := y - offset
+		// Click selects an action (press enter to run it) — never execute on
+		// click, so a mis-mapped click can't fire Remove/Purge by accident.
+		// Actions start at screen y=8 (header bar + detail info block + label).
+		idx := y - 8
 		if idx >= 0 && idx < len(detailActions) {
 			m.actionCursor = idx
-			return m.execDetailAction()
 		}
 
 	case viewSetup:
-		offset := 14
-		idx := y - offset
+		idx := y - 14
 		if idx >= 0 && idx < len(setupActions) {
 			m.setupCursor = idx
-			nm, cmd := m.execSetupAction()
-			return nm, cmd
 		}
 
 	case viewSpawn:
