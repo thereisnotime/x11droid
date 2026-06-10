@@ -122,11 +122,75 @@ func ImageExistsChecked(image string) (exists, ok bool) {
 	return strings.TrimSpace(string(out)) != "", true
 }
 
+// instancesRoot is the directory holding every instance's persistent data.
+func instancesRoot() string {
+	return filepath.Join(system.ResolveHostUser().Home, ".config", "x11droid", "instances")
+}
+
 // instanceDataDir returns the persistent data directory for a named instance,
 // kept under the invoking user's home (not root's) so data is consistent.
 func instanceDataDir(name string) string {
-	home := system.ResolveHostUser().Home
-	return filepath.Join(home, ".config", "x11droid", "instances", name)
+	return filepath.Join(instancesRoot(), name)
+}
+
+// DataDir describes one instance's on-disk data and whether a container still
+// exists for it (a dir without a container is an orphan, safe to prune).
+type DataDir struct {
+	Name         string
+	Path         string
+	Size         string
+	HasContainer bool
+}
+
+// DataDirs lists every instance data directory with its size and whether a
+// matching container exists.
+func DataDirs() ([]DataDir, error) {
+	entries, err := os.ReadDir(instancesRoot())
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	have := map[string]bool{}
+	if instances, err := List(); err == nil {
+		for _, i := range instances {
+			have[i.Name] = true
+		}
+	}
+	var out []DataDir
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		p := filepath.Join(instancesRoot(), e.Name())
+		out = append(out, DataDir{
+			Name:         e.Name(),
+			Path:         p,
+			Size:         dirSize(p),
+			HasContainer: have[e.Name()],
+		})
+	}
+	return out, nil
+}
+
+// PruneOrphans deletes data dirs that have no container and returns their names.
+func PruneOrphans() ([]string, error) {
+	dds, err := DataDirs()
+	if err != nil {
+		return nil, err
+	}
+	var removed []string
+	for _, d := range dds {
+		if d.HasContainer {
+			continue
+		}
+		if err := os.RemoveAll(d.Path); err != nil {
+			return removed, fmt.Errorf("remove %s: %w", d.Path, err)
+		}
+		removed = append(removed, d.Name)
+	}
+	return removed, nil
 }
 
 func List() ([]Instance, error) {

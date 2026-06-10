@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
@@ -78,6 +79,51 @@ func cmdSpawn() *cobra.Command {
 	c.Flags().BoolVar(&devOptions, "dev-options", false, "enable Android Developer Options on first boot")
 	c.Flags().BoolVar(&root, "root", false, "install Magisk (root) on first boot")
 	c.Flags().BoolVar(&noPV, "no-pv", false, "disable persistent volume")
+	return c
+}
+
+func cmdPrune() *cobra.Command {
+	var all bool
+	c := &cobra.Command{
+		Use:   "prune",
+		Short: "Show instance disk usage and delete leftover (orphan) data",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			dds, err := container.DataDirs()
+			if err != nil {
+				return err
+			}
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+			twPrintf(w, "INSTANCE\tSIZE\tDATA\n")
+			for _, d := range dds {
+				state := "container"
+				if !d.HasContainer {
+					state = "orphan"
+				}
+				twPrintf(w, "%s\t%s\t%s\n", d.Name, d.Size, state)
+			}
+			_ = w.Flush()
+
+			if all {
+				instances, _ := container.List()
+				for _, i := range instances {
+					if err := container.Purge(i.Name); err != nil {
+						fmt.Fprintln(os.Stderr, err)
+					}
+				}
+			}
+			removed, err := container.PruneOrphans()
+			if err != nil {
+				return err
+			}
+			if len(removed) == 0 {
+				fmt.Println("\nnothing to prune")
+			} else {
+				fmt.Printf("\nremoved data for: %s\n", strings.Join(removed, ", "))
+			}
+			return nil
+		},
+	}
+	c.Flags().BoolVar(&all, "all", false, "remove ALL instances and their data, not just orphans")
 	return c
 }
 

@@ -92,6 +92,10 @@ type Model struct {
 	logs           string
 	showLogs       bool
 
+	// confirmation prompt for destructive actions ("" = none)
+	confirming  string // action name, e.g. "Remove" / "Purge"
+	confirmName string // target instance
+
 	// spawn view — cursor: 0=name 1=device 2=gapps 3=arm 4=fdroid 5=aurora
 	// 6=obtainium 7=shelter 8=devoptions 9=root 10=pv 11=submit
 	spawnInput      textinput.Model
@@ -331,6 +335,18 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 
+	// A destructive-action confirmation captures input until answered.
+	if m.confirming != "" {
+		switch {
+		case key.Matches(msg, keys.Enter), msg.String() == "y":
+			return m.runConfirmed()
+		case key.Matches(msg, keys.Esc), msg.String() == "n":
+			m.confirming = ""
+			m.confirmName = ""
+		}
+		return m, nil
+	}
+
 	// ? toggles help from any view
 	if key.Matches(msg, keys.Help) {
 		if m.view == viewHelp {
@@ -401,6 +417,17 @@ func (m Model) handleMouseWheel(msg tea.MouseMsg) Model {
 // tracks where they actually render — robust to scrolling and layout changes)
 // and activates them, just like pressing enter/space on the keyboard.
 func (m Model) handleMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	if m.confirming != "" {
+		if zone.Get("confirm-yes").InBounds(msg) {
+			return m.runConfirmed()
+		}
+		if zone.Get("confirm-no").InBounds(msg) {
+			m.confirming = ""
+			m.confirmName = ""
+		}
+		return m, nil
+	}
+
 	switch m.view {
 	case viewMain:
 		for i := range m.instances {
@@ -634,18 +661,11 @@ func (m Model) execDetailAction() (Model, tea.Cmd) {
 		return m, func() tea.Msg {
 			return actionDoneMsg{container.Stop(name)}
 		}
-	case "Remove":
-		m.statusMsg = "Removing..."
-		m.view = viewMain
-		return m, func() tea.Msg {
-			return actionDoneMsg{container.Remove(name)}
-		}
-	case "Purge":
-		m.statusMsg = "Purging (container + data)..."
-		m.view = viewMain
-		return m, func() tea.Msg {
-			return actionDoneMsg{container.Purge(name)}
-		}
+	case "Remove", "Purge":
+		// Destructive — ask first (a stray click/enter shouldn't nuke data).
+		m.confirming = detailActions[m.actionCursor]
+		m.confirmName = name
+		return m, nil
 	case "Shell":
 		return m, tea.ExecProcess(
 			exec.Command("sudo", "podman", "exec", "-it", name, "bash"),
@@ -659,6 +679,23 @@ func (m Model) execDetailAction() (Model, tea.Cmd) {
 			}
 			return logsMsg(logs)
 		}
+	}
+	return m, nil
+}
+
+// runConfirmed executes the destructive action the user confirmed.
+func (m Model) runConfirmed() (Model, tea.Cmd) {
+	name, action := m.confirmName, m.confirming
+	m.confirming = ""
+	m.confirmName = ""
+	m.view = viewMain
+	switch action {
+	case "Remove":
+		m.statusMsg = "Removing..."
+		return m, func() tea.Msg { return actionDoneMsg{container.Remove(name)} }
+	case "Purge":
+		m.statusMsg = "Purging (container + data)..."
+		return m, func() tea.Msg { return actionDoneMsg{container.Purge(name)} }
 	}
 	return m, nil
 }
@@ -782,7 +819,7 @@ func (m Model) submitSpawn() (tea.Model, tea.Cmd) {
 	}
 }
 
-var setupActions = []string{"Load Modules", "Unload Modules", "Build Image", "Refresh"}
+var setupActions = []string{"Load Modules", "Unload Modules", "Build Image", "Prune Orphan Data", "Refresh"}
 
 func (m Model) handleSetup(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
@@ -822,6 +859,12 @@ func (m Model) execSetupAction() (Model, tea.Cmd) {
 				imageExists: err == nil,
 			}
 		})
+	case "Prune Orphan Data":
+		m.statusMsg = "Pruning orphan data..."
+		return m, func() tea.Msg {
+			_, err := container.PruneOrphans()
+			return actionDoneMsg{err}
+		}
 	case "Refresh":
 		return m, tea.Batch(fetchKernelStatus, fetchImageStatus)
 	}

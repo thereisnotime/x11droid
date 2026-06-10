@@ -61,6 +61,7 @@ func rootCmd() *cobra.Command {
 		cmdLogs(),
 		cmdShell(),
 		cmdConfig(),
+		cmdPrune(),
 		cmdSetup(),
 		cmdVersion(),
 	)

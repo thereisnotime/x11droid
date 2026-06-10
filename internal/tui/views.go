@@ -156,6 +156,21 @@ func renderDetail(m Model) string {
 	sb.WriteString(header)
 	sb.WriteString("\n")
 
+	// Confirmation prompt for a destructive action replaces the action list.
+	if m.confirming != "" {
+		q := fmt.Sprintf("%s \"%s\" — remove the container (data kept)?", m.confirming, m.confirmName)
+		if m.confirming == "Purge" {
+			q = fmt.Sprintf("Purge \"%s\" — delete the container AND all its data? This can't be undone.", m.confirmName)
+		}
+		sb.WriteString(lipgloss.NewStyle().Foreground(colorRed).Bold(true).Padding(0, 2).Render(q))
+		sb.WriteString("\n\n")
+		yes := zone.Mark("confirm-yes", styleActionSelected.Render("  Yes  "))
+		no := zone.Mark("confirm-no", styleAction.Foreground(colorSubtext).Render("  No  "))
+		sb.WriteString(lipgloss.NewStyle().Padding(0, 2).Render(yes + "   " + no + "   " + styleMuted.Render("(y / n)")))
+		sb.WriteString("\n")
+		return sb.String()
+	}
+
 	sb.WriteString(lipgloss.NewStyle().Padding(0, 2).Foreground(colorSubtext).Bold(true).Render("Actions"))
 	sb.WriteString("\n")
 
