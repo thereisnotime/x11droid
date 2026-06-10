@@ -74,14 +74,17 @@ fi
 # screen). One-time per instance; marked done so reboots skip it.
 if [ -n "$HIDEARM" ] && [ ! -f /var/lib/waydroid/.x11droid-libndk ]; then
   echo "[x11droid] installing ARM translation (libndk) — a few minutes..."
-  {
+  (
+    # Subshell so USER/HOME (unset for bare root, but waydroid_script needs
+    # them) don't leak into the rest of the entrypoint.
+    export USER=root HOME=/root
     d=/opt/waydroid_script
     [ -d "$d/.git" ] || git clone --depth 1 https://github.com/casualsnek/waydroid_script "$d"
     cd "$d" && \
     { [ -d venv ] || python3 -m venv venv; } && \
     venv/bin/pip install -q -r requirements.txt && \
     venv/bin/python3 main.py install libndk
-  } >/var/lib/waydroid/x11droid-libndk.log 2>&1 \
+  ) >/var/lib/waydroid/x11droid-libndk.log 2>&1 \
     && { touch /var/lib/waydroid/.x11droid-libndk; echo "[x11droid] libndk installed"; } \
     || echo "[x11droid] libndk install failed — see instances/<name>/x11droid-libndk.log" >&2
   cd / || true
