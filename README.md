@@ -25,7 +25,7 @@ Each instance is an isolated Podman container running a nested **weston** compos
 - **Dev Options** and **Root** (Magisk via waydroid_script) toggles
 - **Custom device name** (sets `ro.product.model`)
 - **Config screen** — resolution, orientation, compositor (persisted)
-- **Purge** to wipe an instance's data; **live logs**; `just logcat <name>` for Android logcat
+- **Purge** / **`prune`** to reclaim disk (per-instance or orphan data); **live logs**; `just logcat <name>` for Android logcat
 
 ## Documentation
 

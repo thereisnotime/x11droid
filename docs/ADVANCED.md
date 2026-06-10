@@ -14,8 +14,10 @@ The bare command opens the TUI. Subcommands are scriptable:
 | `start <name>` | Start a stopped instance |
 | `stop <name>` | Stop a running instance (5s grace, then force) |
 | `rm <name> [--purge]` (`remove`, `delete`) | Remove an instance; `--purge` also deletes its Android data |
+| `prune [--all]` | Show per-instance disk usage and delete orphan data (no container); `--all` removes everything |
 | `logs <name>` | Show the container/entrypoint logs |
 | `shell <name>` | Open a bash shell inside the container |
+| `config [--width --height --orientation --compositor]` | Show or set instance defaults |
 | `setup [status\|load\|unload\|build]` | Module status, (un)load `binder_linux`, build the image |
 | `version` | Version, commit, build date |
 
@@ -101,18 +103,24 @@ It does **not** change the CPU: `/proc/cpuinfo` and CPU-Z's SOC tab always show 
 
 ## Persistence, data, cleanup
 
-- Each instance keeps its Android data in `~/.config/x11droid/instances/<name>/` (images, overlays, config). Spawning the same name reuses it (no re-download).
-- `rm` removes the container but keeps the data. Use `rm --purge` (or TUI → Purge) for a clean slate.
+- Each instance keeps its data in `~/.config/x11droid/instances/<name>/` — the base images, overlays, config, and Android `/data` (apps/accounts/settings, persisted into `data/`). Spawning the same name reuses it (no re-download); installed apps survive restarts.
+- `rm` removes the container but **keeps** the data dir. A data dir whose container is gone is an **orphan** — invisible in the dashboard but still using disk.
 - The container image, Containerfile, entrypoint and a fake `modprobe` live under `~/.config/x11droid/`.
 
+**Cleanup** (each instance's base images are ~3 GB, so this adds up):
+
 ```bash
-# remove all instances (containers only)
-sudo podman ps -a --filter label=x11droid=true --format '{{.Names}}' | xargs -r sudo podman rm -f -t 0
-# nuke an instance's data
-sudo x11droid rm <name> --purge
+# show per-instance disk usage and delete orphan data (safe — orphans have no container)
+sudo x11droid prune
+# wipe EVERYTHING (all containers + all data)
+sudo x11droid prune --all
+# delete one instance's data too
+sudo x11droid rm <name> --purge        # or TUI: Instance → Purge (asks to confirm)
 # remove the image
 sudo podman rmi -f x11droid:latest
 ```
+
+In the TUI: **Setup → Prune Orphan Data**, or **Instance → Purge** for a specific one.
 
 ## Multiple instances
 
