@@ -162,7 +162,7 @@ x11droid  /  Dashboard
 | `tab` | Next field (spawn form) |
 | `q` / `ctrl+c` | Quit |
 
-Instance actions include **Show UI** ((re)open the Android window), **Purge** (remove + delete the instance's Android data), and the usual Start/Stop/Remove/Shell/Logs (logs are live).
+Instance actions include **Show UI** ((re)open the Android window — it relaunches the compositor if it died, so a black/closed window recovers without a respawn), **Purge** (remove + delete the instance's Android data), and the usual Start/Stop/Remove/Shell/Logs (logs are live).
 
 ## Just recipes
 

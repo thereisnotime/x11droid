@@ -491,18 +491,28 @@ func Running() ([]Instance, error) {
 // ShowUI (re)opens the Android UI window for a running instance by asking
 // waydroid to show the full UI on the compositor already running inside it.
 func ShowUI(name string) error {
-	// Show-full-ui renders into the running compositor; if it died (e.g. the
-	// window was closed) there's nothing to show into, so fail with a clear
-	// message instead of silently doing nothing. Re-point the fresh exec env at
-	// the entrypoint's session bus and the compositor's wayland socket, then
-	// background show-full-ui (it blocks while the UI is open) via setsid so it
-	// survives the exec returning.
+	// Show-full-ui renders into the running compositor. weston is a background
+	// child of the entrypoint with nothing watching it, so if it died (window
+	// closed, X hiccup, resource contention with another instance) the container
+	// stays Up but has no display and show-full-ui has nothing to render into.
+	// Rather than dead-ending, relaunch weston first — reusing the original
+	// DISPLAY/XAUTHORITY/geometry from the entrypoint's environment (PID 1's
+	// /proc environ) — so "Show UI" doubles as a recovery action.
 	// weston runs with --socket=wl-<name> (per-instance); use that exact name —
 	// globbing the shared XDG_RUNTIME_DIR could grab another instance's socket.
-	script := `pgrep -x weston >/dev/null 2>&1 || pgrep -x cage >/dev/null 2>&1 || ` +
-		`{ echo "compositor is not running — Stop then Start (or respawn) this instance"; exit 1; }
+	sock := "wl-" + name
+	script := `sock="` + sock + `"
+if ! pgrep -x weston >/dev/null 2>&1 && ! pgrep -x cage >/dev/null 2>&1; then
+  # Compositor died — relaunch it with the same display/geometry the entrypoint used.
+  eval "$(tr '\0' '\n' </proc/1/environ | grep -E '^(DISPLAY|XAUTHORITY|XDG_RUNTIME_DIR|WAYDROID_WIDTH|WAYDROID_HEIGHT)=' | sed 's/^/export /')"
+  W="${WAYDROID_WIDTH:-540}"; H="${WAYDROID_HEIGHT:-960}"
+  weston --backend=x11-backend.so --use-pixman --shell=kiosk-shell.so \
+    --socket="$sock" --width="$W" --height="$H" >/tmp/weston.log 2>&1 &
+  for _ in $(seq 1 30); do [ -S "$XDG_RUNTIME_DIR/$sock" ] && break; sleep 0.5; done
+  [ -S "$XDG_RUNTIME_DIR/$sock" ] || { echo "compositor failed to relaunch:"; tail -5 /tmp/weston.log; exit 1; }
+fi
 export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/dbus/session_bus_socket"
-export WAYLAND_DISPLAY="wl-` + name + `"
+export WAYLAND_DISPLAY="$sock"
 setsid waydroid show-full-ui >/dev/null 2>&1 </dev/null &
 sleep 1`
 	out, err := podmanCmd("exec", name, "bash", "-lc", script).CombinedOutput()
