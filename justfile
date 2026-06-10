@@ -26,8 +26,9 @@ default:
     @echo "  \033[32mimage-clean\033[0m    remove the container image"
     @echo ""
     @echo "\033[1;33m DEBUG\033[0m"
-    @echo "  \033[32madb \033[2m<name>\033[0m     interactive Android root shell (waydroid shell)"
-    @echo "  \033[32mlogcat \033[2m<name>\033[0m  capture ~25s of android logcat to /tmp/lc.txt"
+    @echo "  \033[32madb \033[2m<name>\033[0m        interactive Android root shell (waydroid shell)"
+    @echo "  \033[32mapk \033[2m<name> <path>\033[0m install a local .apk into the instance"
+    @echo "  \033[32mlogcat \033[2m<name>\033[0m     capture ~25s of android logcat to /tmp/lc.txt"
     @echo ""
     @echo "\033[2m kernel modules are managed in-app: run x11droid, press s (Setup) → Load Modules\033[0m"
 
@@ -75,6 +76,12 @@ image-clean:
 # open an interactive Android (adb-style) root shell in an instance
 adb name:
     sudo podman exec -it {{name}} bash -lc 'waydroid shell'
+
+# install a local .apk into an instance's Android (like `adb install`)
+apk name path:
+    sudo podman cp {{path}} {{name}}:/tmp/x11droid-install.apk
+    sudo podman exec {{name}} bash -lc 'export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/dbus/session_bus_socket; waydroid app install /tmp/x11droid-install.apk'
+    @echo "installed {{path}} into {{name}}"
 
 # capture ~25s of android logcat from a running instance to /tmp/lc.txt (debug)
 logcat name:
