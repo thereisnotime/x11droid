@@ -39,6 +39,7 @@ RUN apt-get update && \
         python3-pip \
         wl-clipboard \
         dbus \
+        xdotool \
         cage \
         weston && \
     rm -rf /var/lib/apt/lists/*

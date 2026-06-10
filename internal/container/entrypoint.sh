@@ -144,11 +144,36 @@ show_ui() {
 }
 export -f show_ui
 
+# title_window renames weston's X11 output window to
+# "x11droid - <name> - weston[ - Android <ver>]". The Android version isn't
+# known until it boots, so a background task fills it in once available.
+title_window() {
+  local log="$1" wid base
+  for _ in $(seq 1 20); do
+    wid="$(grep -oE 'window id [0-9]+' "$log" 2>/dev/null | head -1 | awk '{print $NF}')"
+    [ -n "$wid" ] && break
+    sleep 0.3
+  done
+  [ -n "$wid" ] || return
+  base="x11droid - ${X11DROID_NAME:-instance} - weston"
+  xdotool set_window --name "$base" "$wid" 2>/dev/null || true
+  (
+    for _ in $(seq 1 120); do
+      ver="$(waydroid prop get ro.build.version.release 2>/dev/null | tr -d '\r\n ')"
+      if [ -n "$ver" ]; then
+        xdotool set_window --name "$base - Android $ver" "$wid" 2>/dev/null || true
+        break
+      fi
+      sleep 5
+    done
+  ) &
+}
+
 # --- compositor + UI ------------------------------------------------------
 run_weston() {
   # kiosk-shell = single fullscreen app, no panel/taskbar/background — the
   # Android window fills the output (what cage would do if it worked on NVIDIA).
-  weston --backend=x11-backend.so --use-pixman --shell=kiosk-shell.so --width="$W" --height="$H" &
+  weston --backend=x11-backend.so --use-pixman --shell=kiosk-shell.so --width="$W" --height="$H" >/tmp/weston.log 2>&1 &
   for _ in $(seq 1 30); do
     ls "$XDG_RUNTIME_DIR"/wayland-[0-9]* >/dev/null 2>&1 && break
     sleep 0.5
@@ -156,6 +181,7 @@ run_weston() {
   WAYLAND_DISPLAY="$(basename "$(ls "$XDG_RUNTIME_DIR"/wayland-[0-9]* 2>/dev/null | head -1)")"
   export WAYLAND_DISPLAY
   echo "[x11droid] weston up on ${WAYLAND_DISPLAY:-?} (${W}x${H})"
+  title_window /tmp/weston.log
   show_ui
 }
 

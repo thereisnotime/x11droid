@@ -121,6 +121,12 @@ func Spawn(opts SpawnOpts) error {
 		// Share the host IPC namespace so the compositor's MIT-SHM / pixman
 		// buffers can be shared with the host X server.
 		"--ipc=host",
+		// Share the host cgroup namespace so the Android LXC can delegate
+		// cgroup controllers — without this its init fails to enable
+		// controllers ("Device or resource busy") and Android boot-loops.
+		"--cgroupns=host",
+		// Name available to the entrypoint for the weston window title.
+		"-e", fmt.Sprintf("X11DROID_NAME=%s", opts.Name),
 		"-e", fmt.Sprintf("DISPLAY=%s", display),
 		"-e", fmt.Sprintf("XDG_RUNTIME_DIR=%s", xdgRuntime),
 		"-e", "WLR_BACKENDS=x11",
