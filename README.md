@@ -9,7 +9,9 @@ A CLI/TUI for running and managing [Waydroid](https://waydro.id) instances insid
 
 > Inspired by [use-waydroid-on-x11](https://github.com/1999AZZAR/use-waydroid-on-x11) by 1999AZZAR.
 
-Each instance is an isolated Podman container with a nested Wayland compositor (cage/weston) that forwards its display back to your X11 session. The host stays clean — only two kernel modules need to be loaded.
+Each instance is an isolated Podman container running a nested **weston** compositor that forwards its display to your X11 session. Android runs as a real LXC container on your host kernel via `binder` — no emulation, no VM.
+
+> **Runs as root.** waydroid needs rootful podman to loop-mount the Android system image (rootless can't, even `--privileged`). Run the app with `sudo x11droid`; it figures out your display and home automatically.
 
 ## How it works
 
@@ -19,8 +21,8 @@ graph TD
         TUI["x11droid TUI\nGo · Bubble Tea"]
         PODMAN["Podman"]
 
-        subgraph CONTAINER["Podman Container  ─  x11droid:latest"]
-            CAGE["cage / weston\nnested Wayland compositor"]
+        subgraph CONTAINER["Podman Container  ─  x11droid:latest (rootful)"]
+            CAGE["weston\npixman · kiosk shell"]
 
             subgraph WD["Waydroid Session"]
                 WDSVC["waydroid services\nAndroid HAL / SurfaceFlinger"]
@@ -67,19 +69,19 @@ graph TD
     style APPS fill:#4a1942,stroke:#9b5de5,color:#fff
 ```
 
-**Control plane:** x11droid manages container lifecycle via the `podman` CLI.
+**Control plane:** x11droid manages container lifecycle via the rootful `podman` CLI.
 
-**Display path:** cage runs as an X11 client inside the container, forwarding its Wayland compositor output to your `$DISPLAY` socket. Android surfaces appear as regular X11 windows.
+**Display path:** weston (pixman renderer, kiosk shell — fullscreen, no panel) runs as an X11 client inside the container over the mounted `/tmp/.X11-unix` socket; Android renders into its window. cage is tried first but falls back to weston, since its wlroots X11 backend can't allocate buffers on NVIDIA.
 
-**Kernel path:** Android IPC (`binder`) runs directly on your host kernel — no emulation, no VM. Apps execute natively at full CPU speed.
+**Kernel path:** Android IPC (`binder`) runs directly on your host kernel — no emulation, no VM. The container provisions its binder devices via **binderfs**, so no special `CONFIG_ANDROID_BINDER_DEVICES` is required.
 
 ## Prerequisites
 
-- Linux with `binder_linux` kernel module available
-- [Podman](https://podman.io)
-- [just](https://just.systems)
-- [asdf](https://asdf-vm.com) with the `golang` plugin (for building from source)
-- X11 session (`echo $XDG_SESSION_TYPE` should print `x11`)
+- Linux with `binder_linux` and binderfs available (`grep binder /proc/filesystems`)
+- [Podman](https://podman.io) — used **rootful** (the app runs under `sudo`)
+- `sudo` access
+- A local **X11** display (`echo $XDG_SESSION_TYPE` → `x11`). Wayland-only sessions won't work; weston forwards over the X11 socket.
+- [just](https://just.systems) + [asdf](https://asdf-vm.com) with the `golang` plugin (to build from source)
 
 ## Quick start
 
@@ -117,31 +119,35 @@ x11droid  /  Dashboard
 
 | View | How to open | Description |
 |------|-------------|-------------|
-| Dashboard | default | All instances with status |
-| Instance | `enter` | Start / Stop / Remove / Shell / Logs |
-| New Instance | `n` | Name input + GApps toggle |
-| Setup | `s` | Kernel module status, image build |
+| Dashboard | default | All instances with status (auto-refreshes) |
+| Instance | `enter` | Show UI / Start / Stop / Remove / Purge / Shell / Logs |
+| New Instance | `n` | Name + GApps / ARM / Persist toggles |
+| Config | `c` | Resolution, orientation, compositor (saved) |
+| Setup | `s` | Module status, image build, sudo modules |
 
 **Key bindings:**
 
 | Key | Action |
 |-----|--------|
 | `↑` / `↓` or `j` / `k` | Navigate |
+| `←` / `→` or `space` | Change value (config / toggles) |
 | `enter` | Select / confirm |
 | `esc` | Back |
 | `n` | New instance |
+| `c` | Config screen |
 | `s` | Setup screen |
 | `r` | Refresh |
-| `space` | Toggle (spawn form) |
 | `tab` | Next field (spawn form) |
 | `q` / `ctrl+c` | Quit |
+
+Instance actions include **Show UI** ((re)open the Android window), **Purge** (remove + delete the instance's Android data), and the usual Start/Stop/Remove/Shell/Logs (logs are live).
 
 ## Just recipes
 
 ```
 just build          build the binary
 just run            build and run the TUI
-just install        install to ~/.local/bin
+just install        install to /usr/local/bin (sudo; needed for `sudo x11droid`)
 just image-build    podman build -t x11droid:latest
 just image-clean    remove the container image
 just check          vet + test + lint
@@ -153,31 +159,25 @@ just clean          remove built binary
 Kernel modules are managed inside the app (Setup screen) or via `x11droid setup load`,
 not through `just`.
 
-## ARM translation (optional)
+## ARM translation & GApps
 
-Most Play Store apps are pure Java and run without any translation layer. For apps with ARM-only native libraries, install `libndk` or `libhoudini` via [waydroid_script](https://github.com/casualsnek/waydroid_script) inside a running instance:
+Pure-Java apps run without any translation layer. Apps (and **GApps** Google services) with ARM-native libraries need a translation layer or they crash/boot-loop on x86_64.
 
-```bash
-# open a shell into a running instance from the TUI (Instance → Shell)
-# or directly:
-podman exec -it <name> bash
+Enable the **ARM** toggle in the New Instance form — on first boot it installs `libndk` via [waydroid_script](https://github.com/casualsnek/waydroid_script) automatically (adds a few minutes). For GApps, enable both **GApps** and **ARM**.
 
-# then inside the container:
-git clone https://github.com/casualsnek/waydroid_script
-cd waydroid_script
-python3 -m venv venv && venv/bin/pip install -r requirements.txt
-sudo venv/bin/python3 main.py install libndk
-```
+Note: GApps may still show "device not certified" in the Play Store — that's a one-time Google device registration (`google.com/android/uncertified`), separate from the boot issue.
 
 ## Cleanup
 
 ```bash
-# stop and remove all x11droid containers
-podman ps -a --filter label=x11droid=true --format '{{.Names}}' | xargs -r podman rm -f
+# stop and remove all x11droid containers (rootful)
+sudo podman ps -a --filter label=x11droid=true --format '{{.Names}}' | xargs -r sudo podman rm -f -t 0
+
+# delete an instance's Android data too — easier from the app: Instance → Purge
 
 # unload kernel modules (or use the app: Setup → Unload Modules)
-x11droid setup unload
+sudo x11droid setup unload
 
 # remove the image
-just image-clean
+sudo podman rmi -f x11droid:latest
 ```
