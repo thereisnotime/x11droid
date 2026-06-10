@@ -19,14 +19,17 @@ func sizeSuffix(s string) string {
 	return ", " + s
 }
 
-// installedBadges renders which one-time system mods are installed.
+// installedBadges renders the system mods and apps installed in an instance.
 func installedBadges(ex container.Extras) string {
 	var parts []string
 	if ex.LibNDK {
-		parts = append(parts, styleRunning.Render("ARM translation"))
+		parts = append(parts, styleRunning.Render("ARM"))
 	}
 	if ex.Magisk {
-		parts = append(parts, styleRunning.Render("Magisk (root)"))
+		parts = append(parts, styleRunning.Render("Magisk"))
+	}
+	for _, a := range ex.Apps {
+		parts = append(parts, styleValue.Render(a))
 	}
 	if len(parts) == 0 {
 		return styleMuted.Render("none")

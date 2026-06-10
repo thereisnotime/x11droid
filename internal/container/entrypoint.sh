@@ -232,7 +232,8 @@ fdroid_install() { # $1 = package id, $2 = friendly name
   apk="/tmp/x11droid-apks/${pkg}.apk"
   curl -fsSL -o "$apk" "https://f-droid.org/repo/${pkg}_${vc}.apk" \
     || { echo "[x11droid] $name: download failed" >&2; return 1; }
-  waydroid app install "$apk" && echo "[x11droid] $name installed"
+  waydroid app install "$apk" && echo "[x11droid] $name installed" \
+    && echo "$name" >> /var/lib/waydroid/.x11droid-apps
 }
 github_install() { # $1 = owner/repo, $2 = asset regex, $3 = friendly name
   local repo="$1" pat="$2" name="$3" url apk
@@ -241,7 +242,8 @@ github_install() { # $1 = owner/repo, $2 = asset regex, $3 = friendly name
   apk="/tmp/x11droid-apks/$(basename "$url")"
   curl -fsSL -o "$apk" "$url" \
     || { echo "[x11droid] $name: download failed" >&2; return 1; }
-  waydroid app install "$apk" && echo "[x11droid] $name installed"
+  waydroid app install "$apk" && echo "[x11droid] $name installed" \
+    && echo "$name" >> /var/lib/waydroid/.x11droid-apps
 }
 want_app() { # $1 = app key — true if present in the comma list $APPS
   case ",${APPS:-}," in *",$1,"*) return 0 ;; *) return 1 ;; esac

@@ -38,6 +38,7 @@ type Extras struct {
 	MemUsage   string // current RAM (used / limit), empty if not running
 	LibNDK     bool   // ARM translation installed
 	Magisk     bool   // root installed
+	Apps       []string
 }
 
 // InstanceExtras gathers the data-dir path/size, current RAM usage, and which
@@ -52,7 +53,24 @@ func InstanceExtras(name string) Extras {
 	e.Size = dirSize(dir)
 	e.LibNDK = fileExists(filepath.Join(dir, ".x11droid-libndk"))
 	e.Magisk = fileExists(filepath.Join(dir, ".x11droid-magisk"))
+	e.Apps = readLines(filepath.Join(dir, ".x11droid-apps"))
 	return e
+}
+
+// readLines returns the non-empty trimmed lines of a file (the installed-app
+// names the entrypoint records), or nil.
+func readLines(p string) []string {
+	data, err := os.ReadFile(p)
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, l := range strings.Split(string(data), "\n") {
+		if l = strings.TrimSpace(l); l != "" {
+			out = append(out, l)
+		}
+	}
+	return out
 }
 
 // memUsage returns the container's current memory usage ("used / limit"), or
