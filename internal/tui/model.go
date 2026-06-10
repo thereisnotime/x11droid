@@ -72,8 +72,9 @@ type Model struct {
 	logs         string
 	showLogs     bool
 
-	// spawn view — cursor: 0=name 1=gapps 2=arm 3=apps 4=pv 5=submit
+	// spawn view — cursor: 0=name 1=device 2=gapps 3=arm 4=apps 5=pv 6=submit
 	spawnInput   textinput.Model
+	spawnDevice  textinput.Model
 	spawnGApps   bool
 	spawnHideARM bool
 	spawnApps    bool
@@ -103,12 +104,22 @@ func newSpawnInput() textinput.Model {
 	return ti
 }
 
+func newDeviceInput() textinput.Model {
+	ti := textinput.New()
+	ti.Placeholder = "(optional, defaults to instance name)"
+	ti.CharLimit = 64
+	ti.Width = 38
+	ti.Prompt = ""
+	return ti
+}
+
 func New(sess system.Info) Model {
 	return Model{
 		view:            viewMain,
 		loading:         true,
 		session:         sess,
 		spawnInput:      newSpawnInput(),
+		spawnDevice:     newDeviceInput(),
 		podmanInstalled: container.PodmanInstalled(),
 		cfg:             config.Load(),
 		isRoot:          system.IsRoot(),
@@ -268,11 +279,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// forward non-key messages to textinput (cursor blink etc.)
-	if m.view == viewSpawn && m.spawnCursor == 0 {
-		var cmd tea.Cmd
-		m.spawnInput, cmd = m.spawnInput.Update(msg)
-		return m, cmd
+	// forward non-key messages to the focused textinput (cursor blink etc.)
+	if m.view == viewSpawn {
+		switch m.spawnCursor {
+		case 0:
+			var cmd tea.Cmd
+			m.spawnInput, cmd = m.spawnInput.Update(msg)
+			return m, cmd
+		case 1:
+			var cmd tea.Cmd
+			m.spawnDevice, cmd = m.spawnDevice.Update(msg)
+			return m, cmd
+		}
 	}
 
 	return m, nil
@@ -339,18 +357,12 @@ func (m Model) handleMouseWheel(msg tea.MouseMsg) Model {
 			m.setupCursor++
 		}
 	case viewSpawn:
-		var next int
 		if up {
-			next = (m.spawnCursor + spawnFields - 1) % spawnFields
+			m.spawnCursor = (m.spawnCursor + spawnFields - 1) % spawnFields
 		} else {
-			next = (m.spawnCursor + 1) % spawnFields
+			m.spawnCursor = (m.spawnCursor + 1) % spawnFields
 		}
-		if next == 0 {
-			m.spawnInput.Focus()
-		} else {
-			m.spawnInput.Blur()
-		}
-		m.spawnCursor = next
+		m.focusSpawnInputs()
 	}
 	return m
 }
@@ -396,8 +408,7 @@ func (m Model) handleMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case viewSpawn:
-		// name~y4, gapps~y7, arm~y10, apps~y13, persist~y16, spawn~y19
-		prev := m.spawnCursor
+		// name~y4, device~y7, gapps~y10, arm~y13, apps~y16, persist~y19, spawn~y22
 		switch {
 		case y >= 3 && y <= 5:
 			m.spawnCursor = 0
@@ -411,12 +422,10 @@ func (m Model) handleMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			m.spawnCursor = 4
 		case y >= 18 && y <= 20:
 			m.spawnCursor = 5
+		case y >= 21 && y <= 23:
+			m.spawnCursor = 6
 		}
-		if m.spawnCursor == 0 && prev != 0 {
-			m.spawnInput.Focus()
-		} else if m.spawnCursor != 0 && prev == 0 {
-			m.spawnInput.Blur()
-		}
+		m.focusSpawnInputs()
 	}
 	return m, nil
 }
@@ -441,6 +450,7 @@ func (m Model) handleMain(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case key.Matches(msg, keys.New):
 		m.spawnInput = newSpawnInput()
+		m.spawnDevice = newDeviceInput()
 		m.spawnInput.Focus()
 		m.spawnGApps = false
 		m.spawnHideARM = false
@@ -621,42 +631,50 @@ func (m Model) execDetailAction() (Model, tea.Cmd) {
 	return m, nil
 }
 
-const spawnFields = 6 // name, gapps, arm, apps, pv, submit
+const spawnFields = 7 // name, device, gapps, arm, apps, pv, submit
+
+// focusSpawnInputs focuses the text input matching the current cursor (name=0,
+// device=1) and blurs the others.
+func (m *Model) focusSpawnInputs() {
+	if m.spawnCursor == 0 {
+		m.spawnInput.Focus()
+	} else {
+		m.spawnInput.Blur()
+	}
+	if m.spawnCursor == 1 {
+		m.spawnDevice.Focus()
+	} else {
+		m.spawnDevice.Blur()
+	}
+}
 
 func (m Model) handleSpawn(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keys.Esc):
 		m.spawnInput.Blur()
+		m.spawnDevice.Blur()
 		m.view = viewMain
 		return m, nil
 
 	case key.Matches(msg, keys.Tab), key.Matches(msg, keys.Down):
 		m.spawnCursor = (m.spawnCursor + 1) % spawnFields
-		if m.spawnCursor == 0 {
-			m.spawnInput.Focus()
-		} else {
-			m.spawnInput.Blur()
-		}
+		m.focusSpawnInputs()
 		return m, nil
 
 	case key.Matches(msg, keys.Up):
 		m.spawnCursor = (m.spawnCursor + spawnFields - 1) % spawnFields
-		if m.spawnCursor == 0 {
-			m.spawnInput.Focus()
-		} else {
-			m.spawnInput.Blur()
-		}
+		m.focusSpawnInputs()
 		return m, nil
 
 	case key.Matches(msg, keys.Space):
 		switch m.spawnCursor {
-		case 1:
-			m.spawnGApps = !m.spawnGApps
 		case 2:
-			m.spawnHideARM = !m.spawnHideARM
+			m.spawnGApps = !m.spawnGApps
 		case 3:
-			m.spawnApps = !m.spawnApps
+			m.spawnHideARM = !m.spawnHideARM
 		case 4:
+			m.spawnApps = !m.spawnApps
+		case 5:
 			m.spawnPV = !m.spawnPV
 		}
 		return m, nil
@@ -671,6 +689,7 @@ func (m Model) handleSpawn(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			w, h := m.cfg.EffectiveDims()
 			opts := container.SpawnOpts{
 				Name:       name,
+				DeviceName: strings.TrimSpace(m.spawnDevice.Value()),
 				GApps:      m.spawnGApps,
 				HideARM:    m.spawnHideARM,
 				Apps:       m.spawnApps,
@@ -680,22 +699,28 @@ func (m Model) handleSpawn(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				Compositor: m.cfg.Compositor,
 			}
 			m.spawnInput.Blur()
+			m.spawnDevice.Blur()
 			m.statusMsg = "Spawning..."
 			m.view = viewMain
 			return m, func() tea.Msg {
 				return actionDoneMsg{container.Spawn(opts)}
 			}
 		}
-		if m.spawnCursor == 0 {
-			m.spawnCursor = 1
-			m.spawnInput.Blur()
+		if m.spawnCursor < 2 {
+			m.spawnCursor++
+			m.focusSpawnInputs()
 		}
 		return m, nil
 	}
 
-	if m.spawnCursor == 0 {
+	switch m.spawnCursor {
+	case 0:
 		var cmd tea.Cmd
 		m.spawnInput, cmd = m.spawnInput.Update(msg)
+		return m, cmd
+	case 1:
+		var cmd tea.Cmd
+		m.spawnDevice, cmd = m.spawnDevice.Update(msg)
 		return m, cmd
 	}
 	return m, nil

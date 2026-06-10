@@ -194,17 +194,27 @@ func renderSpawn(m Model) string {
 	sb.WriteString(pad.Render(lipgloss.JoinHorizontal(lipgloss.Center, label.Render("Name"), inputView)))
 	sb.WriteString("\n\n")
 
-	sb.WriteString(toggle(m.spawnGApps, m.spawnCursor, 1, "GApps", "Google Play Store"))
+	// Device name (Android model)
+	devView := m.spawnDevice.View()
+	if m.spawnCursor == 1 {
+		devView = styleInputFocused.Render(devView)
+	} else {
+		devView = styleInput.Render(devView)
+	}
+	sb.WriteString(pad.Render(lipgloss.JoinHorizontal(lipgloss.Center, label.Render("Device"), devView)))
 	sb.WriteString("\n\n")
-	sb.WriteString(toggle(m.spawnHideARM, m.spawnCursor, 2, "ARM", "libndk ARM translation — needed for GApps (adds minutes to first boot)"))
+
+	sb.WriteString(toggle(m.spawnGApps, m.spawnCursor, 2, "GApps", "Google Play Store"))
 	sb.WriteString("\n\n")
-	sb.WriteString(toggle(m.spawnApps, m.spawnCursor, 3, "Apps", "install F-Droid, Aurora, Obtainium, Shelter after first boot"))
+	sb.WriteString(toggle(m.spawnHideARM, m.spawnCursor, 3, "ARM", "libndk ARM translation — needed for GApps (adds minutes to first boot)"))
 	sb.WriteString("\n\n")
-	sb.WriteString(toggle(m.spawnPV, m.spawnCursor, 4, "Persist", "keep Android data between container restarts"))
+	sb.WriteString(toggle(m.spawnApps, m.spawnCursor, 4, "Apps", "install F-Droid, Aurora, Obtainium, Shelter after first boot"))
+	sb.WriteString("\n\n")
+	sb.WriteString(toggle(m.spawnPV, m.spawnCursor, 5, "Persist", "keep Android data between container restarts"))
 	sb.WriteString("\n\n")
 
 	var submitBtn string
-	if m.spawnCursor == 5 {
+	if m.spawnCursor == 6 {
 		submitBtn = styleActionSelected.Render("  Spawn  ")
 	} else {
 		submitBtn = styleAction.Foreground(colorSubtext).Render("  Spawn  ")

@@ -41,6 +41,7 @@ func cmdList() *cobra.Command {
 
 func cmdSpawn() *cobra.Command {
 	var gapps, hidearm, apps, noPV bool
+	var deviceName string
 
 	c := &cobra.Command{
 		Use:   "spawn <name>",
@@ -51,6 +52,7 @@ func cmdSpawn() *cobra.Command {
 			w, h := cfg.EffectiveDims()
 			return container.Spawn(container.SpawnOpts{
 				Name:       args[0],
+				DeviceName: deviceName,
 				GApps:      gapps,
 				HideARM:    hidearm,
 				Apps:       apps,
@@ -61,6 +63,7 @@ func cmdSpawn() *cobra.Command {
 			})
 		},
 	}
+	c.Flags().StringVar(&deviceName, "device-name", "", "Android device/model name (default: instance name)")
 	c.Flags().BoolVar(&gapps, "gapps", false, "enable Google Play Store")
 	c.Flags().BoolVar(&hidearm, "hidearm", false, "enable libndk ARM translation")
 	c.Flags().BoolVar(&apps, "apps", false, "install F-Droid, Aurora, Obtainium, Shelter after first boot")

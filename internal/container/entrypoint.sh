@@ -11,6 +11,8 @@ APPS="${WAYDROID_APPS:-}"
 W="${WAYDROID_WIDTH:-540}"
 H="${WAYDROID_HEIGHT:-960}"
 X11DROID_NAME="${X11DROID_NAME:-instance}"
+# Android device/model name — explicit override, else the instance name.
+DEVICE_NAME="${WAYDROID_DEVICE:-$X11DROID_NAME}"
 
 cleanup() {
   trap - EXIT INT TERM HUP
@@ -91,17 +93,17 @@ if [ -n "$HIDEARM" ] && [ ! -f /var/lib/waydroid/.x11droid-libndk ]; then
   cd / || true
 fi
 
-# Device name — set the Android model (CPU-Z / About phone) to the instance
-# name via waydroid_base.prop, and the Settings "Device name" once booted.
-if [ -n "$X11DROID_NAME" ] && [ "$X11DROID_NAME" != "instance" ] && [ -f /var/lib/waydroid/waydroid_base.prop ]; then
+# Device name — set the Android model (CPU-Z / About phone) via
+# waydroid_base.prop, and the Settings "Device name" once booted.
+if [ -n "$DEVICE_NAME" ] && [ "$DEVICE_NAME" != "instance" ] && [ -f /var/lib/waydroid/waydroid_base.prop ]; then
   sed -i '/^ro\.product\.model=/d' /var/lib/waydroid/waydroid_base.prop
-  echo "ro.product.model=$X11DROID_NAME" >> /var/lib/waydroid/waydroid_base.prop
+  echo "ro.product.model=$DEVICE_NAME" >> /var/lib/waydroid/waydroid_base.prop
   (
     for _ in $(seq 1 120); do
       [ "$(waydroid prop get sys.boot_completed 2>/dev/null | tr -d '\r ')" = "1" ] && break
       sleep 5
     done
-    waydroid shell settings put global device_name "$X11DROID_NAME" 2>/dev/null || true
+    waydroid shell settings put global device_name "$DEVICE_NAME" 2>/dev/null || true
   ) &
 fi
 

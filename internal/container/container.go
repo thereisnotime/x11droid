@@ -94,6 +94,7 @@ func List() ([]Instance, error) {
 // SpawnOpts holds the configuration for a new instance.
 type SpawnOpts struct {
 	Name       string
+	DeviceName string // Android device/model name (empty = use instance name)
 	GApps      bool
 	HideARM    bool   // install libndk ARM translation layer
 	Apps       bool   // install F-Droid + Aurora Store after first boot
@@ -204,6 +205,9 @@ func Spawn(opts SpawnOpts) error {
 	}
 	if opts.Apps {
 		args = append(args, "-e", "WAYDROID_APPS=1")
+	}
+	if opts.DeviceName != "" {
+		args = append(args, "-e", fmt.Sprintf("WAYDROID_DEVICE=%s", opts.DeviceName))
 	}
 	args = append(args, "x11droid:latest")
 
