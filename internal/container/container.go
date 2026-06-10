@@ -170,10 +170,18 @@ func Spawn(opts SpawnOpts) error {
 		args = append(args, "-v", fmt.Sprintf("%s:/var/lib/waydroid", dataDir))
 	}
 
-	if _, err := os.Stat(xauth); err == nil {
+	// Give the container an X11 cookie. Use a hostname-agnostic (FamilyWild)
+	// copy so the rootful container — different hostname, connecting as real
+	// root — still authenticates to the host X server; fall back to the raw
+	// cookie if xauth isn't available.
+	cookie := wildXauth(xauth, display)
+	if cookie == "" {
+		cookie = xauth
+	}
+	if _, err := os.Stat(cookie); err == nil {
 		args = append(args,
-			"-e", fmt.Sprintf("XAUTHORITY=%s", xauth),
-			"-v", fmt.Sprintf("%s:%s:ro", xauth, xauth),
+			"-e", "XAUTHORITY=/tmp/.x11droid.xauth",
+			"-v", fmt.Sprintf("%s:/tmp/.x11droid.xauth:ro", cookie),
 		)
 	}
 
@@ -190,6 +198,32 @@ func Spawn(opts SpawnOpts) error {
 		return fmt.Errorf("podman run: %w\n%s", err, out)
 	}
 	return nil
+}
+
+// wildXauth writes a FamilyWild (hostname-agnostic) copy of the X11 cookie for
+// the given display and returns its path. This lets a container with a
+// different hostname, connecting as real root under rootful podman, still
+// authenticate to the host X server. Returns "" if xauth is unavailable or the
+// cookie can't be extracted.
+func wildXauth(srcXauth, display string) string {
+	if _, err := exec.LookPath("xauth"); err != nil {
+		return ""
+	}
+	dst := filepath.Join(configDir(), "xauth")
+	_ = os.Remove(dst)
+	// Extract the cookie for this display, rewrite its address family to wild
+	// (ffff), and merge it into a fresh file.
+	script := fmt.Sprintf(
+		"xauth -f %q nlist %q 2>/dev/null | sed -e 's/^..../ffff/' | xauth -f %q nmerge - 2>/dev/null",
+		srcXauth, display, dst,
+	)
+	if err := exec.Command("sh", "-c", script).Run(); err != nil {
+		return ""
+	}
+	if fi, err := os.Stat(dst); err != nil || fi.Size() == 0 {
+		return ""
+	}
+	return dst
 }
 
 func Start(name string) error {
