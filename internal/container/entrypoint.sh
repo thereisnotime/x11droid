@@ -91,6 +91,20 @@ if [ -n "$HIDEARM" ] && [ ! -f /var/lib/waydroid/.x11droid-libndk ]; then
   cd / || true
 fi
 
+# Device name — set the Android model (CPU-Z / About phone) to the instance
+# name via waydroid_base.prop, and the Settings "Device name" once booted.
+if [ -n "$X11DROID_NAME" ] && [ "$X11DROID_NAME" != "instance" ] && [ -f /var/lib/waydroid/waydroid_base.prop ]; then
+  sed -i '/^ro\.product\.model=/d' /var/lib/waydroid/waydroid_base.prop
+  echo "ro.product.model=$X11DROID_NAME" >> /var/lib/waydroid/waydroid_base.prop
+  (
+    for _ in $(seq 1 120); do
+      [ "$(waydroid prop get sys.boot_completed 2>/dev/null | tr -d '\r ')" = "1" ] && break
+      sleep 5
+    done
+    waydroid shell settings put global device_name "$X11DROID_NAME" 2>/dev/null || true
+  ) &
+fi
+
 # --- binder via binderfs --------------------------------------------------
 # Kernels with CONFIG_ANDROID_BINDER_DEVICES="" create no binder nodes. binderfs
 # is available, so mount it and allocate the nodes. Crucially, use the device
