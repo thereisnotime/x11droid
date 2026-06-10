@@ -245,7 +245,9 @@ func Stop(name string) error {
 }
 
 func Remove(name string) error {
-	out, err := podmanCmd("rm", "-f", name).CombinedOutput()
+	// -t 0 force-kills immediately — waydroid containers can hang in "Stopping"
+	// (loop mounts + LXC not tearing down), and a graceful wait never returns.
+	out, err := podmanCmd("rm", "-f", "-t", "0", name).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("podman rm %s: %w\n%s", name, err, out)
 	}
