@@ -13,7 +13,10 @@ Each instance is an isolated Podman container running a nested **weston** compos
 
 > **Runs as root.** waydroid needs rootful podman to loop-mount the Android system image (rootless can't, even `--privileged`). Run the app with `sudo x11droid`; it figures out your display and home automatically.
 
-<!-- Add a screenshot here: docs/screenshot.png (TUI dashboard + an Android window) -->
+<p align="center">
+  <img src="docs/screenshot.png" alt="Two x11droid instances running side by side" width="420">
+  <br><sub>Two instances (<code>test1</code>, <code>test2</code>) running at once — fullscreen, native x86.</sub>
+</p>
 
 ## Features
 
