@@ -13,6 +13,24 @@ Each instance is an isolated Podman container running a nested **weston** compos
 
 > **Runs as root.** waydroid needs rootful podman to loop-mount the Android system image (rootless can't, even `--privileged`). Run the app with `sudo x11droid`; it figures out your display and home automatically.
 
+<!-- Add a screenshot here: docs/screenshot.png (TUI dashboard + an Android window) -->
+
+## Features
+
+- **Multiple isolated instances**, each its own Android device + data
+- **TUI + scriptable CLI** for the full lifecycle (spawn / start / stop / remove / purge / shell / logs / attach)
+- **Fullscreen Android** via weston kiosk-shell (no panel), titled `x11droid - <name> - weston - Android <ver>`
+- **GApps** (Google Play) and **ARM translation** (libndk) toggles
+- **Apps bundle** — optionally install F-Droid, Aurora, Obtainium, Shelter on first boot
+- **Custom device name** (sets `ro.product.model`)
+- **Config screen** — resolution, orientation, compositor (persisted)
+- **Purge** to wipe an instance's data; **live logs**; `just logcat <name>` for Android logcat
+
+## Documentation
+
+- **[Advanced usage](docs/ADVANCED.md)** — full CLI reference, internals, apps/ARM, device spoofing, persistence
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** — symptom → cause → fix for the common issues
+
 ## How it works
 
 ```mermaid
