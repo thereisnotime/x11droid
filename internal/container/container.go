@@ -235,7 +235,9 @@ func Start(name string) error {
 }
 
 func Stop(name string) error {
-	out, err := podmanCmd("stop", name).CombinedOutput()
+	// Give waydroid a short grace period to unmount the LXC, then force it —
+	// the default 10s leaves the container in "Stopping" too long.
+	out, err := podmanCmd("stop", "-t", "5", name).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("podman stop %s: %w\n%s", name, err, out)
 	}
