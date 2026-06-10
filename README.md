@@ -210,4 +210,5 @@ sudo podman rmi -f x11droid:latest
 - [ ] **More Android flavors** — pick the system image at spawn time (today: vanilla / GApps); offer other LineageOS variants and Android versions as waydroid publishes them.
 - [ ] **adb over TCP** — optional `adb connect` to an instance for the full `adb` toolchain (push/pull, `adb logcat -f`, Android Studio).
 - [ ] **Device spoofing presets** — one-click `Build.*` profiles (e.g. a real Pixel) for app compatibility.
-- [ ] Screenshot/GIF in the README.
+- [ ] **Fix config-folder ownership** — running under `sudo` leaves `~/.config/x11droid/` (instances, images, data) owned by `root`, so the invoking user can't manage or delete them without `sudo`. `chown` the tree back to `SUDO_USER` so it stays user-owned.
+- [x] Screenshot/GIF in the README.
