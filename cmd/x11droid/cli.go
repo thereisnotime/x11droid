@@ -40,7 +40,7 @@ func cmdList() *cobra.Command {
 }
 
 func cmdSpawn() *cobra.Command {
-	var gapps, hidearm, noPV bool
+	var gapps, hidearm, apps, noPV bool
 
 	c := &cobra.Command{
 		Use:   "spawn <name>",
@@ -53,6 +53,7 @@ func cmdSpawn() *cobra.Command {
 				Name:       args[0],
 				GApps:      gapps,
 				HideARM:    hidearm,
+				Apps:       apps,
 				PV:         !noPV,
 				Width:      w,
 				Height:     h,
@@ -62,6 +63,7 @@ func cmdSpawn() *cobra.Command {
 	}
 	c.Flags().BoolVar(&gapps, "gapps", false, "enable Google Play Store")
 	c.Flags().BoolVar(&hidearm, "hidearm", false, "enable libndk ARM translation")
+	c.Flags().BoolVar(&apps, "apps", false, "install F-Droid + Aurora Store after first boot")
 	c.Flags().BoolVar(&noPV, "no-pv", false, "disable persistent volume")
 	return c
 }

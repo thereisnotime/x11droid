@@ -72,10 +72,11 @@ type Model struct {
 	logs         string
 	showLogs     bool
 
-	// spawn view — cursor: 0=name 1=gapps 2=hidearm 3=pv 4=submit
+	// spawn view — cursor: 0=name 1=gapps 2=arm 3=apps 4=pv 5=submit
 	spawnInput   textinput.Model
 	spawnGApps   bool
 	spawnHideARM bool
+	spawnApps    bool
 	spawnPV      bool
 	spawnCursor  int
 
@@ -395,7 +396,7 @@ func (m Model) handleMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case viewSpawn:
-		// name~y4, gapps~y7, hidearm~y10, persist~y13, spawn~y16
+		// name~y4, gapps~y7, arm~y10, apps~y13, persist~y16, spawn~y19
 		prev := m.spawnCursor
 		switch {
 		case y >= 3 && y <= 5:
@@ -408,6 +409,8 @@ func (m Model) handleMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			m.spawnCursor = 3
 		case y >= 15 && y <= 17:
 			m.spawnCursor = 4
+		case y >= 18 && y <= 20:
+			m.spawnCursor = 5
 		}
 		if m.spawnCursor == 0 && prev != 0 {
 			m.spawnInput.Focus()
@@ -441,6 +444,7 @@ func (m Model) handleMain(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.spawnInput.Focus()
 		m.spawnGApps = false
 		m.spawnHideARM = false
+		m.spawnApps = false
 		m.spawnPV = true
 		m.spawnCursor = 0
 		m.view = viewSpawn
@@ -617,7 +621,7 @@ func (m Model) execDetailAction() (Model, tea.Cmd) {
 	return m, nil
 }
 
-const spawnFields = 5 // name, gapps, hidearm, pv, submit
+const spawnFields = 6 // name, gapps, arm, apps, pv, submit
 
 func (m Model) handleSpawn(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
@@ -651,6 +655,8 @@ func (m Model) handleSpawn(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case 2:
 			m.spawnHideARM = !m.spawnHideARM
 		case 3:
+			m.spawnApps = !m.spawnApps
+		case 4:
 			m.spawnPV = !m.spawnPV
 		}
 		return m, nil
@@ -667,6 +673,7 @@ func (m Model) handleSpawn(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				Name:       name,
 				GApps:      m.spawnGApps,
 				HideARM:    m.spawnHideARM,
+				Apps:       m.spawnApps,
 				PV:         m.spawnPV,
 				Width:      w,
 				Height:     h,

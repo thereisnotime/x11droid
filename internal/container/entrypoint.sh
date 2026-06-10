@@ -7,6 +7,7 @@ set -u
 COMPOSITOR="${WAYDROID_COMPOSITOR:-auto}"
 GAPPS="${WAYDROID_GAPPS:-}"
 HIDEARM="${WAYDROID_HIDEARM:-}"
+APPS="${WAYDROID_APPS:-}"
 W="${WAYDROID_WIDTH:-540}"
 H="${WAYDROID_HEIGHT:-960}"
 X11DROID_NAME="${X11DROID_NAME:-instance}"
@@ -167,6 +168,29 @@ show_ui() {
 }
 export -f show_ui
 
+# install_apps waits for Android to finish booting, then installs F-Droid and
+# Aurora Store from the F-Droid repo (resolving the current version via its
+# API). Runs in the background; marks done so it only installs once.
+fdroid_install() { # $1 = package id, $2 = friendly name
+  local pkg="$1" name="$2" vc apk
+  vc="$(curl -fsSL "https://f-droid.org/api/v1/packages/$pkg" 2>/dev/null | grep -oE '"suggestedVersionCode"[ :]+[0-9]+' | grep -oE '[0-9]+' | head -1)"
+  [ -n "$vc" ] || { echo "[x11droid] $name: could not resolve version" >&2; return 1; }
+  apk="/tmp/x11droid-apks/${pkg}.apk"
+  curl -fsSL -o "$apk" "https://f-droid.org/repo/${pkg}_${vc}.apk" \
+    || { echo "[x11droid] $name: download failed" >&2; return 1; }
+  waydroid app install "$apk" && echo "[x11droid] $name installed"
+}
+install_apps() {
+  for _ in $(seq 1 120); do
+    [ "$(waydroid prop get sys.boot_completed 2>/dev/null | tr -d '\r ')" = "1" ] && break
+    sleep 5
+  done
+  mkdir -p /tmp/x11droid-apks
+  fdroid_install org.fdroid.fdroid "F-Droid"
+  fdroid_install com.aurora.store "Aurora Store"
+  touch /var/lib/waydroid/.x11droid-apps
+}
+
 # title_window renames weston's X11 output window to
 # "x11droid - <name> - weston[ - Android <ver>]". The Android version isn't
 # known until it boots, so a background task fills it in once available.
@@ -191,6 +215,12 @@ title_window() {
     done
   ) &
 }
+
+# App stores (F-Droid + Aurora) — once, in the background, after Android boots.
+if [ -n "$APPS" ] && [ ! -f /var/lib/waydroid/.x11droid-apps ]; then
+  echo "[x11droid] will install F-Droid + Aurora once Android finishes booting..."
+  install_apps >/var/lib/waydroid/x11droid-apps.log 2>&1 &
+fi
 
 # --- compositor + UI ------------------------------------------------------
 run_weston() {

@@ -96,6 +96,7 @@ type SpawnOpts struct {
 	Name       string
 	GApps      bool
 	HideARM    bool   // install libndk ARM translation layer
+	Apps       bool   // install F-Droid + Aurora Store after first boot
 	PV         bool   // use persistent volume for waydroid data
 	Width      int    // compositor window width  (0 = image default)
 	Height     int    // compositor window height (0 = image default)
@@ -200,6 +201,9 @@ func Spawn(opts SpawnOpts) error {
 	}
 	if opts.HideARM {
 		args = append(args, "-e", "WAYDROID_HIDEARM=1")
+	}
+	if opts.Apps {
+		args = append(args, "-e", "WAYDROID_APPS=1")
 	}
 	args = append(args, "x11droid:latest")
 
