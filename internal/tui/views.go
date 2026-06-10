@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -87,6 +88,10 @@ func renderMain(m Model) string {
 		id := padRight(inst.ID, 14)
 		ram := padRight(inst.RAM, 10)
 		status := statusLabel(inst.Status)
+		if androidStopped(inst.Status, inst.RAM) {
+			status = statusStyle(inst.Status).Render(padRight(inst.Status, 20)) +
+				styleMuted.Render(" Android off")
+		}
 		image := styleMuted.Render(truncate(inst.Image, 24))
 
 		row := fmt.Sprintf(" %s  %s  %s  %s  %s",
@@ -148,7 +153,7 @@ func renderDetail(m Model) string {
 			styleValue.Bold(true).Render(inst.Name),
 			lbl("ID:")+styleValue.Render(inst.ID),
 			lbl("Image:")+styleValue.Render(inst.Image),
-			lbl("Status:")+statusStyle(inst.Status).Render(inst.Status),
+			lbl("Status:")+statusStyle(inst.Status).Render(inst.Status)+androidNote(inst.Status, inst.RAM),
 			lbl("RAM:")+styleValue.Render(ram),
 			lbl("Created:")+styleValue.Render(created),
 			lbl("Data:")+styleValue.Render(data),
@@ -570,6 +575,46 @@ func moduleStateBadge(mod kernel.ModuleStatus) string {
 
 func statusLabel(status string) string {
 	return statusStyle(status).Render(padRight(status, 20))
+}
+
+// ramMB parses a podman MemUsage "used" value ("18.77MB", "1.23GB") to MB.
+func ramMB(s string) float64 {
+	mult := 1.0
+	switch {
+	case strings.Contains(s, "GB") || strings.Contains(s, "GiB"):
+		mult = 1024
+	case strings.Contains(s, "kB") || strings.Contains(s, "KiB"):
+		mult = 1.0 / 1024
+	}
+	digits := strings.Map(func(r rune) rune {
+		if (r >= '0' && r <= '9') || r == '.' {
+			return r
+		}
+		return -1
+	}, s)
+	v, err := strconv.ParseFloat(digits, 64)
+	if err != nil {
+		return 0
+	}
+	return v * mult
+}
+
+// androidStopped reports that the podman container is up but Android isn't
+// actually running inside it (RAM far below a booted Android's footprint). The
+// container can outlive the Android session because the entrypoint supervisor
+// keeps PID 1 alive for Hide UI — so "Up" alone no longer means Android is live.
+func androidStopped(status, ram string) bool {
+	mb := ramMB(ram)
+	return strings.HasPrefix(status, "Up") && mb > 0 && mb < 80
+}
+
+// androidNote returns a muted suffix for the detail Status line when the
+// container is up but Android isn't running (so the user isn't misled by "Up").
+func androidNote(status, ram string) string {
+	if androidStopped(status, ram) {
+		return styleMuted.Render("  — Android not running (use Show UI to (re)start it)")
+	}
+	return ""
 }
 
 func padRight(s string, n int) string {
