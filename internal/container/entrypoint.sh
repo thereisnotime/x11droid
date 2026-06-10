@@ -146,7 +146,9 @@ export -f show_ui
 
 # --- compositor + UI ------------------------------------------------------
 run_weston() {
-  weston --backend=x11-backend.so --use-pixman --width="$W" --height="$H" &
+  # kiosk-shell = single fullscreen app, no panel/taskbar/background — the
+  # Android window fills the output (what cage would do if it worked on NVIDIA).
+  weston --backend=x11-backend.so --use-pixman --shell=kiosk-shell.so --width="$W" --height="$H" &
   for _ in $(seq 1 30); do
     ls "$XDG_RUNTIME_DIR"/wayland-[0-9]* >/dev/null 2>&1 && break
     sleep 0.5
