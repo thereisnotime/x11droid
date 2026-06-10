@@ -200,3 +200,11 @@ sudo x11droid setup unload
 # remove the image
 sudo podman rmi -f x11droid:latest
 ```
+
+## Roadmap
+
+- [ ] **Cache the base images** — download the LineageOS system/vendor images once and share them read-only across instances (overlays + `/data` stay per-instance), instead of a full ~3 GB copy per instance.
+- [ ] **More Android flavors** — pick the system image at spawn time (today: vanilla / GApps); offer other LineageOS variants and Android versions as waydroid publishes them.
+- [ ] **adb over TCP** — optional `adb connect` to an instance for the full `adb` toolchain (push/pull, `adb logcat -f`, Android Studio).
+- [ ] **Device spoofing presets** — one-click `Build.*` profiles (e.g. a real Pixel) for app compatibility.
+- [ ] Screenshot/GIF in the README.
