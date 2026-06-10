@@ -208,13 +208,19 @@ func renderSpawn(m Model) string {
 	sb.WriteString("\n\n")
 	sb.WriteString(toggle(m.spawnHideARM, m.spawnCursor, 3, "ARM", "libndk ARM translation — needed for GApps (adds minutes to first boot)"))
 	sb.WriteString("\n\n")
-	sb.WriteString(toggle(m.spawnApps, m.spawnCursor, 4, "Apps", "install F-Droid, Aurora, Obtainium, Shelter after first boot"))
+	sb.WriteString(toggle(m.spawnFDroid, m.spawnCursor, 4, "F-Droid", "install F-Droid after first boot"))
 	sb.WriteString("\n\n")
-	sb.WriteString(toggle(m.spawnPV, m.spawnCursor, 5, "Persist", "keep Android data between container restarts"))
+	sb.WriteString(toggle(m.spawnAurora, m.spawnCursor, 5, "Aurora", "install Aurora Store after first boot"))
+	sb.WriteString("\n\n")
+	sb.WriteString(toggle(m.spawnObtainium, m.spawnCursor, 6, "Obtainium", "install Obtainium after first boot"))
+	sb.WriteString("\n\n")
+	sb.WriteString(toggle(m.spawnShelter, m.spawnCursor, 7, "Shelter", "install Shelter after first boot"))
+	sb.WriteString("\n\n")
+	sb.WriteString(toggle(m.spawnPV, m.spawnCursor, 8, "Persist", "keep Android data between container restarts"))
 	sb.WriteString("\n\n")
 
 	var submitBtn string
-	if m.spawnCursor == 6 {
+	if m.spawnCursor == 9 {
 		submitBtn = styleActionSelected.Render("  Spawn  ")
 	} else {
 		submitBtn = styleAction.Foreground(colorSubtext).Render("  Spawn  ")

@@ -72,14 +72,18 @@ type Model struct {
 	logs         string
 	showLogs     bool
 
-	// spawn view — cursor: 0=name 1=device 2=gapps 3=arm 4=apps 5=pv 6=submit
-	spawnInput   textinput.Model
-	spawnDevice  textinput.Model
-	spawnGApps   bool
-	spawnHideARM bool
-	spawnApps    bool
-	spawnPV      bool
-	spawnCursor  int
+	// spawn view — cursor: 0=name 1=device 2=gapps 3=arm 4=fdroid 5=aurora
+	// 6=obtainium 7=shelter 8=pv 9=submit
+	spawnInput     textinput.Model
+	spawnDevice    textinput.Model
+	spawnGApps     bool
+	spawnHideARM   bool
+	spawnFDroid    bool
+	spawnAurora    bool
+	spawnObtainium bool
+	spawnShelter   bool
+	spawnPV        bool
+	spawnCursor    int
 
 	// setup view
 	kernelStatus    []kernel.ModuleStatus
@@ -405,7 +409,8 @@ func (m Model) handleMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case viewSpawn:
-		// name~y4, device~y7, gapps~y10, arm~y13, apps~y16, persist~y19, spawn~y22
+		// name~y4, device~y7, gapps~y10, arm~y13, fdroid~y16, aurora~y19,
+		// obtainium~y22, shelter~y25, persist~y28, spawn~y31 (3 rows apart)
 		switch {
 		case y >= 3 && y <= 5:
 			m.spawnCursor = 0
@@ -421,6 +426,12 @@ func (m Model) handleMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			m.spawnCursor = 5
 		case y >= 21 && y <= 23:
 			m.spawnCursor = 6
+		case y >= 24 && y <= 26:
+			m.spawnCursor = 7
+		case y >= 27 && y <= 29:
+			m.spawnCursor = 8
+		case y >= 30 && y <= 32:
+			m.spawnCursor = 9
 		}
 		m.focusSpawnInputs()
 	}
@@ -451,7 +462,10 @@ func (m Model) handleMain(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.spawnInput.Focus()
 		m.spawnGApps = false
 		m.spawnHideARM = false
-		m.spawnApps = false
+		m.spawnFDroid = false
+		m.spawnAurora = false
+		m.spawnObtainium = false
+		m.spawnShelter = false
 		m.spawnPV = true
 		m.spawnCursor = 0
 		m.view = viewSpawn
@@ -628,7 +642,7 @@ func (m Model) execDetailAction() (Model, tea.Cmd) {
 	return m, nil
 }
 
-const spawnFields = 7 // name, device, gapps, arm, apps, pv, submit
+const spawnFields = 10 // name, device, gapps, arm, fdroid, aurora, obtainium, shelter, pv, submit
 
 // focusSpawnInputs focuses the text input matching the current cursor (name=0,
 // device=1) and blurs the others.
@@ -670,8 +684,14 @@ func (m Model) handleSpawn(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case 3:
 			m.spawnHideARM = !m.spawnHideARM
 		case 4:
-			m.spawnApps = !m.spawnApps
+			m.spawnFDroid = !m.spawnFDroid
 		case 5:
+			m.spawnAurora = !m.spawnAurora
+		case 6:
+			m.spawnObtainium = !m.spawnObtainium
+		case 7:
+			m.spawnShelter = !m.spawnShelter
+		case 8:
 			m.spawnPV = !m.spawnPV
 		}
 		return m, nil
@@ -689,7 +709,10 @@ func (m Model) handleSpawn(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				DeviceName: strings.TrimSpace(m.spawnDevice.Value()),
 				GApps:      m.spawnGApps,
 				HideARM:    m.spawnHideARM,
-				Apps:       m.spawnApps,
+				FDroid:     m.spawnFDroid,
+				Aurora:     m.spawnAurora,
+				Obtainium:  m.spawnObtainium,
+				Shelter:    m.spawnShelter,
 				PV:         m.spawnPV,
 				Width:      w,
 				Height:     h,

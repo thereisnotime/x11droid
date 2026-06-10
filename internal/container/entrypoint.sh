@@ -184,9 +184,10 @@ show_ui() {
 }
 export -f show_ui
 
-# install_apps waits for Android to finish booting, then installs F-Droid and
-# Aurora Store from the F-Droid repo (resolving the current version via its
-# API). Runs in the background; marks done so it only installs once.
+# install_apps waits for Android to finish booting, then installs the apps named
+# in the comma-separated $APPS list (fdroid/aurora/shelter from the F-Droid repo,
+# resolving the current version via its API; obtainium from GitHub releases).
+# Runs in the background; marks done so it only installs once.
 fdroid_install() { # $1 = package id, $2 = friendly name
   local pkg="$1" name="$2" vc apk
   vc="$(curl -fsSL "https://f-droid.org/api/v1/packages/$pkg" 2>/dev/null | grep -oE '"suggestedVersionCode"[ :]+[0-9]+' | grep -oE '[0-9]+' | head -1)"
@@ -205,16 +206,19 @@ github_install() { # $1 = owner/repo, $2 = asset regex, $3 = friendly name
     || { echo "[x11droid] $name: download failed" >&2; return 1; }
   waydroid app install "$apk" && echo "[x11droid] $name installed"
 }
+want_app() { # $1 = app key — true if present in the comma list $APPS
+  case ",${APPS:-}," in *",$1,"*) return 0 ;; *) return 1 ;; esac
+}
 install_apps() {
   for _ in $(seq 1 120); do
     [ "$(waydroid prop get sys.boot_completed 2>/dev/null | tr -d '\r ')" = "1" ] && break
     sleep 5
   done
   mkdir -p /tmp/x11droid-apks
-  fdroid_install org.fdroid.fdroid "F-Droid"
-  fdroid_install com.aurora.store "Aurora Store"
-  fdroid_install net.typeblog.shelter "Shelter"
-  github_install ImranR98/Obtainium 'app-x86_64-release\.apk$' "Obtainium"
+  want_app fdroid    && fdroid_install org.fdroid.fdroid "F-Droid"
+  want_app aurora    && fdroid_install com.aurora.store "Aurora Store"
+  want_app shelter   && fdroid_install net.typeblog.shelter "Shelter"
+  want_app obtainium && github_install ImranR98/Obtainium 'app-x86_64-release\.apk$' "Obtainium"
   touch /var/lib/waydroid/.x11droid-apps
 }
 
@@ -243,9 +247,9 @@ title_window() {
   ) &
 }
 
-# App stores (F-Droid + Aurora) — once, in the background, after Android boots.
+# Selected apps — once, in the background, after Android boots.
 if [ -n "$APPS" ] && [ ! -f /var/lib/waydroid/.x11droid-apps ]; then
-  echo "[x11droid] will install F-Droid, Aurora, Obtainium, Shelter once Android finishes booting..."
+  echo "[x11droid] will install selected apps ($APPS) once Android finishes booting..."
   install_apps >/var/lib/waydroid/x11droid-apps.log 2>&1 &
 fi
 

@@ -40,7 +40,7 @@ func cmdList() *cobra.Command {
 }
 
 func cmdSpawn() *cobra.Command {
-	var gapps, hidearm, apps, noPV bool
+	var gapps, hidearm, fdroid, aurora, obtainium, shelter, noPV bool
 	var deviceName string
 
 	c := &cobra.Command{
@@ -55,7 +55,10 @@ func cmdSpawn() *cobra.Command {
 				DeviceName: deviceName,
 				GApps:      gapps,
 				HideARM:    hidearm,
-				Apps:       apps,
+				FDroid:     fdroid,
+				Aurora:     aurora,
+				Obtainium:  obtainium,
+				Shelter:    shelter,
 				PV:         !noPV,
 				Width:      w,
 				Height:     h,
@@ -66,7 +69,10 @@ func cmdSpawn() *cobra.Command {
 	c.Flags().StringVar(&deviceName, "device-name", "", "Android device/model name (default: instance name)")
 	c.Flags().BoolVar(&gapps, "gapps", false, "enable Google Play Store")
 	c.Flags().BoolVar(&hidearm, "hidearm", false, "enable libndk ARM translation")
-	c.Flags().BoolVar(&apps, "apps", false, "install F-Droid, Aurora, Obtainium, Shelter after first boot")
+	c.Flags().BoolVar(&fdroid, "fdroid", false, "install F-Droid after first boot")
+	c.Flags().BoolVar(&aurora, "aurora", false, "install Aurora Store after first boot")
+	c.Flags().BoolVar(&obtainium, "obtainium", false, "install Obtainium after first boot")
+	c.Flags().BoolVar(&shelter, "shelter", false, "install Shelter after first boot")
 	c.Flags().BoolVar(&noPV, "no-pv", false, "disable persistent volume")
 	return c
 }

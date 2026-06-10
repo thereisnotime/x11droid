@@ -26,7 +26,10 @@ The bare command opens the TUI. Subcommands are scriptable:
 | `--device-name <name>` | instance name | Android device/model name |
 | `--gapps` | off | Google Play Store (LineageOS GApps image) |
 | `--hidearm` | off | Install libndk ARM translation on first boot |
-| `--apps` | off | Install F-Droid, Aurora, Obtainium, Shelter after first boot |
+| `--fdroid` | off | Install F-Droid after first boot |
+| `--aurora` | off | Install Aurora Store after first boot |
+| `--obtainium` | off | Install Obtainium after first boot |
+| `--shelter` | off | Install Shelter after first boot |
 | `--no-pv` | off | Disable the persistent volume (data won't survive removal) |
 
 Resolution / orientation / compositor come from the saved **Config** (TUI: `c`), persisted to `~/.config/x11droid/config.json`.
@@ -34,7 +37,7 @@ Resolution / orientation / compositor come from the saved **Config** (TUI: `c`),
 Example:
 
 ```bash
-sudo x11droid spawn pixel9 --device-name "Pixel 9 Pro" --gapps --hidearm --apps
+sudo x11droid spawn pixel9 --device-name "Pixel 9 Pro" --gapps --hidearm --fdroid --aurora --obtainium --shelter
 sudo x11droid logs pixel9          # watch first boot (downloads ~1GB, installs libndk + apps)
 sudo x11droid attach pixel9        # reopen the window if you closed it
 ```
@@ -57,7 +60,7 @@ The container entrypoint is `internal/container/entrypoint.sh` (embedded in the 
 
 ## Apps & ARM translation
 
-- The **Apps** toggle installs F-Droid + Aurora + Shelter (from the F-Droid repo, current version resolved via its API) and Obtainium (native x86_64 build from GitHub releases) once Android finishes booting. One-time, marked done in the data dir.
+- The **F-Droid**, **Aurora**, and **Shelter** toggles each install that app from the F-Droid repo (current version resolved via its API); **Obtainium** installs the native x86_64 build from GitHub releases. Only the toggles you enable are installed, once Android finishes booting. One-time, marked done in the data dir.
 - The **ARM** toggle installs **libndk** via [waydroid_script](https://github.com/casualsnek/waydroid_script) on first boot. Needed for apps (and GApps services) that ship ARM-only native libraries — it translates ARM→x86 per-app. The base system stays native x86 (fast).
 
 ## Device naming / spoofing

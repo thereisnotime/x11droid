@@ -97,11 +97,33 @@ type SpawnOpts struct {
 	DeviceName string // Android device/model name (empty = use instance name)
 	GApps      bool
 	HideARM    bool   // install libndk ARM translation layer
-	Apps       bool   // install F-Droid + Aurora Store after first boot
+	FDroid     bool   // install F-Droid after first boot
+	Aurora     bool   // install Aurora Store after first boot
+	Obtainium  bool   // install Obtainium after first boot
+	Shelter    bool   // install Shelter after first boot
 	PV         bool   // use persistent volume for waydroid data
 	Width      int    // compositor window width  (0 = image default)
 	Height     int    // compositor window height (0 = image default)
 	Compositor string // "", "auto", "weston" or "cage"
+}
+
+// selectedApps returns the comma-separated WAYDROID_APPS value for the apps the
+// user picked, or "" when none are selected (so the env var is omitted).
+func selectedApps(opts SpawnOpts) string {
+	var apps []string
+	if opts.FDroid {
+		apps = append(apps, "fdroid")
+	}
+	if opts.Aurora {
+		apps = append(apps, "aurora")
+	}
+	if opts.Obtainium {
+		apps = append(apps, "obtainium")
+	}
+	if opts.Shelter {
+		apps = append(apps, "shelter")
+	}
+	return strings.Join(apps, ",")
 }
 
 func Spawn(opts SpawnOpts) error {
@@ -203,8 +225,8 @@ func Spawn(opts SpawnOpts) error {
 	if opts.HideARM {
 		args = append(args, "-e", "WAYDROID_HIDEARM=1")
 	}
-	if opts.Apps {
-		args = append(args, "-e", "WAYDROID_APPS=1")
+	if apps := selectedApps(opts); apps != "" {
+		args = append(args, "-e", fmt.Sprintf("WAYDROID_APPS=%s", apps))
 	}
 	if opts.DeviceName != "" {
 		args = append(args, "-e", fmt.Sprintf("WAYDROID_DEVICE=%s", opts.DeviceName))
