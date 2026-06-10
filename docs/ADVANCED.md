@@ -75,7 +75,23 @@ Root won't pass Play Integrity / SafetyNet — Magisk is detectable here and the
 
 The **Dev Options** toggle (or `--dev-options`) flips `development_settings_enabled` and `adb_enabled` once Android finishes booting, so the Developer Options menu and adb are available without tapping the build number seven times.
 
-To open an interactive Android root shell in a running instance: `just adb <name>` (runs `waydroid shell` inside the container).
+## Debug & dev helpers
+
+These `just` recipes act on a running instance (they `sudo podman exec` into it):
+
+| Recipe | Does |
+|--------|------|
+| `just adb <name>` | Interactive Android **root shell** (`waydroid shell`) — e.g. `magisk -v`, `su -c id` |
+| `just apk <name> <path>` | Install a local `.apk` into the instance (`waydroid app install`) — the `adb install` equivalent |
+| `just logcat <name>` | Capture ~25s of Android **logcat** to `/tmp/lc.txt` |
+
+```bash
+just adb pixel9
+just apk pixel9 ~/Downloads/app.apk
+just logcat pixel9
+```
+
+`just adb` opens a shell, not the full `adb` binary. For the real `adb` toolchain (push/pull, `adb logcat -f`, Android Studio), enable adb-over-TCP inside Android and `adb connect` to the instance's `waydroid0` bridge IP.
 
 ## Device naming / spoofing
 
