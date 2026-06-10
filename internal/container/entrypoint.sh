@@ -63,6 +63,13 @@ rm -f /run/dbus/session_bus_socket 2>/dev/null || true
 dbus-daemon --session --address="$DBUS_SESSION_BUS_ADDRESS" --fork 2>/dev/null || true
 echo "[x11droid] session bus: $DBUS_SESSION_BUS_ADDRESS"
 
+# Persist Android /data. waydroid stores userdata at ~/.local/share/waydroid/data
+# — inside the container's ephemeral filesystem — so without this, installed
+# apps/accounts/settings vanish on every restart. Redirect it into the mounted
+# /var/lib/waydroid volume.
+mkdir -p /var/lib/waydroid/data /root/.local/share/waydroid
+[ -e /root/.local/share/waydroid/data ] || ln -s /var/lib/waydroid/data /root/.local/share/waydroid/data
+
 # --- first-run init (downloads ~1GB) --------------------------------------
 if [ ! -f /var/lib/waydroid/images/system.img ]; then
   echo "[x11droid] First run: initialising Waydroid (downloads ~1GB, please wait)..."
