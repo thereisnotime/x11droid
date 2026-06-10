@@ -294,9 +294,12 @@ func Running() ([]Instance, error) {
 // ShowUI (re)opens the Android UI window for a running instance by asking
 // waydroid to show the full UI on the compositor already running inside it.
 func ShowUI(name string) error {
-	// Discover the compositor's wayland socket inside the container, then show
-	// the UI — covers both weston (wayland-N) and cage.
-	script := `export WAYLAND_DISPLAY="$(basename "$(ls "$XDG_RUNTIME_DIR"/wayland-[0-9]* 2>/dev/null | head -1)")"; waydroid show-full-ui`
+	// A `podman exec` gets a fresh env, so re-point it at the same session bus
+	// the entrypoint started (otherwise waydroid tries dbus-launch and fails)
+	// and rediscover the compositor's wayland socket (weston-N or cage).
+	script := `export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/dbus/session_bus_socket"; ` +
+		`export WAYLAND_DISPLAY="$(basename "$(ls "$XDG_RUNTIME_DIR"/wayland-[0-9]* 2>/dev/null | head -1)")"; ` +
+		`waydroid show-full-ui`
 	out, err := podmanCmd("exec", name, "bash", "-lc", script).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("show-full-ui %s: %w\n%s", name, err, out)
