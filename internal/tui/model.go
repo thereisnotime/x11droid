@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"os/exec"
 	"strings"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	zone "github.com/lrstanley/bubblezone"
 	"github.com/thereisnotime/x11droid/internal/config"
 	"github.com/thereisnotime/x11droid/internal/container"
 	"github.com/thereisnotime/x11droid/internal/kernel"
@@ -395,70 +397,66 @@ func (m Model) handleMouseWheel(msg tea.MouseMsg) Model {
 	return m
 }
 
+// handleMouseClick maps clicks to interactive elements via bubblezone (which
+// tracks where they actually render — robust to scrolling and layout changes)
+// and activates them, just like pressing enter/space on the keyboard.
 func (m Model) handleMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	y := msg.Y
-
 	switch m.view {
 	case viewMain:
-		// list items start after: header(1) + instances_header_with_padding(3) + newline(1) = y5
-		// add 4 more if warning is shown
-		offset := 5
-		if m.session.Warning() != "" {
-			offset += 4
-		}
-		idx := y - offset
-		if idx >= 0 && idx < len(m.instances) {
-			m.cursor = idx
-			// single click opens detail
-			return m, m.openDetail()
+		for i := range m.instances {
+			if zone.Get(fmt.Sprintf("inst-%d", i)).InBounds(msg) {
+				m.cursor = i
+				return m, m.openDetail()
+			}
 		}
 
 	case viewDetail:
-		// Click selects an action (press enter to run it) — never execute on
-		// click, so a mis-mapped click can't fire Remove/Purge by accident.
-		// Actions start at screen y=12 (header bar + 8-line info block + label).
-		idx := y - 12
-		if idx >= 0 && idx < len(detailActions) {
-			m.actionCursor = idx
+		for i := range detailActions {
+			if zone.Get(fmt.Sprintf("act-%d", i)).InBounds(msg) {
+				m.actionCursor = i
+				return m.execDetailAction()
+			}
 		}
 
 	case viewSetup:
-		idx := y - 14
-		if idx >= 0 && idx < len(setupActions) {
-			m.setupCursor = idx
+		for i := range setupActions {
+			if zone.Get(fmt.Sprintf("setup-%d", i)).InBounds(msg) {
+				m.setupCursor = i
+				return m.execSetupAction()
+			}
+		}
+
+	case viewConfig:
+		for i := 0; i < configFields; i++ {
+			if zone.Get(fmt.Sprintf("cfg-%d", i)).InBounds(msg) {
+				m.configCursor = i
+				if i == configFields-1 {
+					if err := m.cfg.Save(); err != nil {
+						m.err = err
+					} else {
+						m.statusMsg = "config saved"
+					}
+				} else {
+					m.applyConfigChange(1)
+				}
+				return m, nil
+			}
 		}
 
 	case viewSpawn:
-		// name~y4, device~y7, gapps~y10, arm~y13, fdroid~y16, aurora~y19,
-		// obtainium~y22, shelter~y25, devoptions~y28, root~y31, persist~y34,
-		// spawn~y37 (3 rows apart)
-		switch {
-		case y >= 3 && y <= 5:
-			m.spawnCursor = 0
-		case y >= 6 && y <= 8:
-			m.spawnCursor = 1
-		case y >= 9 && y <= 11:
-			m.spawnCursor = 2
-		case y >= 12 && y <= 14:
-			m.spawnCursor = 3
-		case y >= 15 && y <= 17:
-			m.spawnCursor = 4
-		case y >= 18 && y <= 20:
-			m.spawnCursor = 5
-		case y >= 21 && y <= 23:
-			m.spawnCursor = 6
-		case y >= 24 && y <= 26:
-			m.spawnCursor = 7
-		case y >= 27 && y <= 29:
-			m.spawnCursor = 8
-		case y >= 30 && y <= 32:
-			m.spawnCursor = 9
-		case y >= 33 && y <= 35:
-			m.spawnCursor = 10
-		case y >= 36 && y <= 38:
-			m.spawnCursor = 11
+		for i := 0; i < spawnFields; i++ {
+			if zone.Get(fmt.Sprintf("spawn-%d", i)).InBounds(msg) {
+				m.spawnCursor = i
+				m.focusSpawnInputs()
+				switch {
+				case i >= 2 && i <= 10:
+					m.toggleSpawn(i)
+				case i == spawnFields-1:
+					return m.submitSpawn()
+				}
+				return m, nil
+			}
 		}
-		m.focusSpawnInputs()
 	}
 	return m, nil
 }
@@ -701,59 +699,12 @@ func (m Model) handleSpawn(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, keys.Space):
-		switch m.spawnCursor {
-		case 2:
-			m.spawnGApps = !m.spawnGApps
-		case 3:
-			m.spawnHideARM = !m.spawnHideARM
-		case 4:
-			m.spawnFDroid = !m.spawnFDroid
-		case 5:
-			m.spawnAurora = !m.spawnAurora
-		case 6:
-			m.spawnObtainium = !m.spawnObtainium
-		case 7:
-			m.spawnShelter = !m.spawnShelter
-		case 8:
-			m.spawnDevOptions = !m.spawnDevOptions
-		case 9:
-			m.spawnRoot = !m.spawnRoot
-		case 10:
-			m.spawnPV = !m.spawnPV
-		}
+		m.toggleSpawn(m.spawnCursor)
 		return m, nil
 
 	case key.Matches(msg, keys.Enter):
 		if m.spawnCursor == spawnFields-1 {
-			name := strings.TrimSpace(m.spawnInput.Value())
-			if name == "" {
-				m.err = &simpleErr{"instance name cannot be empty"}
-				return m, nil
-			}
-			w, h := m.cfg.EffectiveDims()
-			opts := container.SpawnOpts{
-				Name:       name,
-				DeviceName: strings.TrimSpace(m.spawnDevice.Value()),
-				GApps:      m.spawnGApps,
-				HideARM:    m.spawnHideARM,
-				FDroid:     m.spawnFDroid,
-				Aurora:     m.spawnAurora,
-				Obtainium:  m.spawnObtainium,
-				Shelter:    m.spawnShelter,
-				DevOptions: m.spawnDevOptions,
-				Root:       m.spawnRoot,
-				PV:         m.spawnPV,
-				Width:      w,
-				Height:     h,
-				Compositor: m.cfg.Compositor,
-			}
-			m.spawnInput.Blur()
-			m.spawnDevice.Blur()
-			m.statusMsg = "Spawning..."
-			m.view = viewMain
-			return m, func() tea.Msg {
-				return actionDoneMsg{container.Spawn(opts)}
-			}
+			return m.submitSpawn()
 		}
 		if m.spawnCursor < 2 {
 			m.spawnCursor++
@@ -773,6 +724,62 @@ func (m Model) handleSpawn(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 	return m, nil
+}
+
+// toggleSpawn flips the boolean for a spawn-form toggle field (2..10).
+func (m *Model) toggleSpawn(idx int) {
+	switch idx {
+	case 2:
+		m.spawnGApps = !m.spawnGApps
+	case 3:
+		m.spawnHideARM = !m.spawnHideARM
+	case 4:
+		m.spawnFDroid = !m.spawnFDroid
+	case 5:
+		m.spawnAurora = !m.spawnAurora
+	case 6:
+		m.spawnObtainium = !m.spawnObtainium
+	case 7:
+		m.spawnShelter = !m.spawnShelter
+	case 8:
+		m.spawnDevOptions = !m.spawnDevOptions
+	case 9:
+		m.spawnRoot = !m.spawnRoot
+	case 10:
+		m.spawnPV = !m.spawnPV
+	}
+}
+
+func (m Model) submitSpawn() (tea.Model, tea.Cmd) {
+	name := strings.TrimSpace(m.spawnInput.Value())
+	if name == "" {
+		m.err = &simpleErr{"instance name cannot be empty"}
+		return m, nil
+	}
+	w, h := m.cfg.EffectiveDims()
+	opts := container.SpawnOpts{
+		Name:       name,
+		DeviceName: strings.TrimSpace(m.spawnDevice.Value()),
+		GApps:      m.spawnGApps,
+		HideARM:    m.spawnHideARM,
+		FDroid:     m.spawnFDroid,
+		Aurora:     m.spawnAurora,
+		Obtainium:  m.spawnObtainium,
+		Shelter:    m.spawnShelter,
+		DevOptions: m.spawnDevOptions,
+		Root:       m.spawnRoot,
+		PV:         m.spawnPV,
+		Width:      w,
+		Height:     h,
+		Compositor: m.cfg.Compositor,
+	}
+	m.spawnInput.Blur()
+	m.spawnDevice.Blur()
+	m.statusMsg = "Spawning..."
+	m.view = viewMain
+	return m, func() tea.Msg {
+		return actionDoneMsg{container.Spawn(opts)}
+	}
 }
 
 var setupActions = []string{"Load Modules", "Unload Modules", "Build Image", "Refresh"}
@@ -830,7 +837,7 @@ func (m Model) View() string {
 	body, focus := m.renderBody()
 	avail := m.height - lipgloss.Height(header) - lipgloss.Height(footer)
 	body = clipBody(body, focus, avail)
-	return lipgloss.JoinVertical(lipgloss.Left, header, body, footer)
+	return zone.Scan(lipgloss.JoinVertical(lipgloss.Left, header, body, footer))
 }
 
 // clipBody windows body to at most height lines, scrolled so the focus line

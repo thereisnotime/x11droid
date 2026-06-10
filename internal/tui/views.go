@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	zone "github.com/lrstanley/bubblezone"
 	"github.com/thereisnotime/x11droid/internal/config"
 	"github.com/thereisnotime/x11droid/internal/container"
 	"github.com/thereisnotime/x11droid/internal/kernel"
@@ -91,11 +92,13 @@ func renderMain(m Model) string {
 			image,
 		)
 
+		var rendered string
 		if i == m.cursor {
-			sb.WriteString(styleSelected.Width(m.width - 2).Render(row))
+			rendered = styleSelected.Width(m.width - 2).Render(row)
 		} else {
-			sb.WriteString(styleNormal.Width(m.width - 2).Render(row))
+			rendered = styleNormal.Width(m.width - 2).Render(row)
 		}
+		sb.WriteString(zone.Mark(fmt.Sprintf("inst-%d", i), rendered))
 		sb.WriteString("\n")
 	}
 
@@ -160,7 +163,7 @@ func renderDetail(m Model) string {
 		} else {
 			line = styleAction.Foreground(colorSubtext).Render("  " + action + "  ")
 		}
-		sb.WriteString(lipgloss.NewStyle().Padding(0, 2).Render(line))
+		sb.WriteString(zone.Mark(fmt.Sprintf("act-%d", i), lipgloss.NewStyle().Padding(0, 2).Render(line)))
 		sb.WriteString("\n")
 	}
 
@@ -253,7 +256,7 @@ func renderSpawn(m Model) (string, int) {
 	} else {
 		inputView = styleInput.Render(inputView)
 	}
-	sb.WriteString(pad.Render(lipgloss.JoinHorizontal(lipgloss.Center, label.Render("Name"), inputView)))
+	sb.WriteString(zone.Mark("spawn-0", pad.Render(lipgloss.JoinHorizontal(lipgloss.Center, label.Render("Name"), inputView))))
 	sb.WriteString("\n\n")
 
 	// Device name (Android model)
@@ -264,36 +267,23 @@ func renderSpawn(m Model) (string, int) {
 	} else {
 		devView = styleInput.Render(devView)
 	}
-	sb.WriteString(pad.Render(lipgloss.JoinHorizontal(lipgloss.Center, label.Render("Device"), devView)))
+	sb.WriteString(zone.Mark("spawn-1", pad.Render(lipgloss.JoinHorizontal(lipgloss.Center, label.Render("Device"), devView))))
 	sb.WriteString("\n\n")
 
-	mark(2)
-	sb.WriteString(toggle(m.spawnGApps, m.spawnCursor, 2, "GApps", "Google Play Store"))
-	sb.WriteString("\n\n")
-	mark(3)
-	sb.WriteString(toggle(m.spawnHideARM, m.spawnCursor, 3, "ARM", "libndk ARM translation — needed for GApps (adds minutes to first boot)"))
-	sb.WriteString("\n\n")
-	mark(4)
-	sb.WriteString(toggle(m.spawnFDroid, m.spawnCursor, 4, "F-Droid", "install F-Droid after first boot"))
-	sb.WriteString("\n\n")
-	mark(5)
-	sb.WriteString(toggle(m.spawnAurora, m.spawnCursor, 5, "Aurora", "install Aurora Store after first boot"))
-	sb.WriteString("\n\n")
-	mark(6)
-	sb.WriteString(toggle(m.spawnObtainium, m.spawnCursor, 6, "Obtainium", "install Obtainium after first boot"))
-	sb.WriteString("\n\n")
-	mark(7)
-	sb.WriteString(toggle(m.spawnShelter, m.spawnCursor, 7, "Shelter", "install Shelter after first boot"))
-	sb.WriteString("\n\n")
-	mark(8)
-	sb.WriteString(toggle(m.spawnDevOptions, m.spawnCursor, 8, "Dev Options", "enable Android Developer Options"))
-	sb.WriteString("\n\n")
-	mark(9)
-	sb.WriteString(toggle(m.spawnRoot, m.spawnCursor, 9, "Root", "install Magisk (root) on first boot"))
-	sb.WriteString("\n\n")
-	mark(10)
-	sb.WriteString(toggle(m.spawnPV, m.spawnCursor, 10, "Persist", "keep Android data between container restarts"))
-	sb.WriteString("\n\n")
+	tog := func(idx int, on bool, name, hint string) {
+		mark(idx)
+		sb.WriteString(zone.Mark(fmt.Sprintf("spawn-%d", idx), toggle(on, m.spawnCursor, idx, name, hint)))
+		sb.WriteString("\n\n")
+	}
+	tog(2, m.spawnGApps, "GApps", "Google Play Store")
+	tog(3, m.spawnHideARM, "ARM", "libndk ARM translation — needed for GApps (adds minutes to first boot)")
+	tog(4, m.spawnFDroid, "F-Droid", "install F-Droid after first boot")
+	tog(5, m.spawnAurora, "Aurora", "install Aurora Store after first boot")
+	tog(6, m.spawnObtainium, "Obtainium", "install Obtainium after first boot")
+	tog(7, m.spawnShelter, "Shelter", "install Shelter after first boot")
+	tog(8, m.spawnDevOptions, "Dev Options", "enable Android Developer Options")
+	tog(9, m.spawnRoot, "Root", "install Magisk (root) on first boot")
+	tog(10, m.spawnPV, "Persist", "keep Android data between container restarts")
 
 	mark(11)
 	var submitBtn string
@@ -302,7 +292,7 @@ func renderSpawn(m Model) (string, int) {
 	} else {
 		submitBtn = styleAction.Foreground(colorSubtext).Render("  Spawn  ")
 	}
-	sb.WriteString(pad.Render(lipgloss.JoinHorizontal(lipgloss.Center, label.Render(""), submitBtn)))
+	sb.WriteString(zone.Mark("spawn-11", pad.Render(lipgloss.JoinHorizontal(lipgloss.Center, label.Render(""), submitBtn))))
 	sb.WriteString("\n")
 
 	return sb.String(), focusLine
@@ -344,7 +334,7 @@ func renderSetup(m Model) string {
 		} else {
 			line = styleAction.Foreground(colorSubtext).Render("  " + action + "  ")
 		}
-		sb.WriteString(lipgloss.NewStyle().Padding(0, 2).Render(line))
+		sb.WriteString(zone.Mark(fmt.Sprintf("setup-%d", i), lipgloss.NewStyle().Padding(0, 2).Render(line)))
 		sb.WriteString("\n")
 	}
 
@@ -375,7 +365,7 @@ func renderConfig(m Model) string {
 			row = lipgloss.JoinHorizontal(lipgloss.Center, row,
 				lipgloss.NewStyle().Foreground(colorMuted).Render("  "+hint))
 		}
-		return pad.Render(row)
+		return zone.Mark(fmt.Sprintf("cfg-%d", idx), pad.Render(row))
 	}
 
 	w, h := m.cfg.EffectiveDims()
@@ -393,7 +383,7 @@ func renderConfig(m Model) string {
 	} else {
 		saveBtn = styleAction.Foreground(colorSubtext).Render("  Save  ")
 	}
-	sb.WriteString(pad.Render(lipgloss.JoinHorizontal(lipgloss.Center, label.Render(""), saveBtn)))
+	sb.WriteString(zone.Mark("cfg-3", pad.Render(lipgloss.JoinHorizontal(lipgloss.Center, label.Render(""), saveBtn))))
 	sb.WriteString("\n")
 
 	return sb.String()

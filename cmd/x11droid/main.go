@@ -6,6 +6,7 @@ import (
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
+	zone "github.com/lrstanley/bubblezone"
 	"github.com/spf13/cobra"
 	"github.com/thereisnotime/x11droid/internal/system"
 	"github.com/thereisnotime/x11droid/internal/tui"
@@ -72,6 +73,7 @@ func launchTUI() error {
 	if w := sess.Warning(); w != "" {
 		fmt.Fprintf(os.Stderr, "warning: %s\n", w)
 	}
+	zone.NewGlobal() // clickable mouse zones for the TUI
 	p := tea.NewProgram(tui.New(sess), tea.WithAltScreen(), tea.WithMouseCellMotion())
 	_, err := p.Run()
 	return err
