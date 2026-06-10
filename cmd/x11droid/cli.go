@@ -215,6 +215,18 @@ func cmdAttach() *cobra.Command {
 	}
 }
 
+func cmdHide() *cobra.Command {
+	return &cobra.Command{
+		Use:   "hide <name>",
+		Short: "Close the GUI window but keep the instance running",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			fmt.Printf("hiding GUI for %s (still running — reopen with: x11droid attach %s)...\n", args[0], args[0])
+			return container.HideUI(args[0])
+		},
+	}
+}
+
 func cmdStart() *cobra.Command {
 	return &cobra.Command{
 		Use:   "start <name>",

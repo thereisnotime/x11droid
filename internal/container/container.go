@@ -343,6 +343,15 @@ func Spawn(opts SpawnOpts) error {
 		args = append(args, "-v", fmt.Sprintf("%s:/usr/local/bin/modprobe:ro", fakeModprobe))
 	}
 
+	// Mount the current entrypoint over the baked-in copy so it ships with the
+	// binary — changes take effect on respawn, no multi-GB image rebuild needed.
+	entrypoint := filepath.Join(configDir(), "entrypoint.sh")
+	if err := os.MkdirAll(configDir(), 0755); err == nil {
+		if err := os.WriteFile(entrypoint, []byte(entrypointContent), 0755); err == nil {
+			args = append(args, "-v", fmt.Sprintf("%s:/usr/bin/waydroid-session.sh:ro", entrypoint))
+		}
+	}
+
 	if opts.PV {
 		dataDir := instanceDataDir(opts.Name)
 		if err := os.MkdirAll(dataDir, 0755); err != nil {
@@ -518,6 +527,21 @@ sleep 1`
 	out, err := podmanCmd("exec", name, "bash", "-lc", script).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("show-full-ui %s: %w\n%s", name, err, out)
+	}
+	return nil
+}
+
+// HideUI closes the Android window without stopping the instance: it stops the
+// waydroid session and kills the compositor, leaving the container manager (and
+// the booted Android system layer) up so ShowUI can bring the window back
+// without a fresh spawn. The container itself stays Up because the entrypoint's
+// supervisor keeps PID 1 alive independent of the compositor.
+func HideUI(name string) error {
+	script := `waydroid session stop >/dev/null 2>&1 || true
+killall weston cage >/dev/null 2>&1 || true`
+	out, err := podmanCmd("exec", name, "bash", "-lc", script).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("hide-ui %s: %w\n%s", name, err, out)
 	}
 	return nil
 }

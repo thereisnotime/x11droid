@@ -619,7 +619,7 @@ func (m *Model) applyConfigChange(delta int) {
 	}
 }
 
-var detailActions = []string{"Show UI", "Start", "Stop", "Remove", "Purge", "Shell", "Logs"}
+var detailActions = []string{"Show UI", "Hide UI", "Start", "Stop", "Remove", "Purge", "Shell", "Logs"}
 
 func (m Model) handleDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.showLogs {
@@ -650,6 +650,11 @@ func (m Model) execDetailAction() (Model, tea.Cmd) {
 		m.statusMsg = "Opening GUI..."
 		return m, func() tea.Msg {
 			return actionDoneMsg{container.ShowUI(name)}
+		}
+	case "Hide UI":
+		m.statusMsg = "Hiding GUI (instance keeps running)..."
+		return m, func() tea.Msg {
+			return actionDoneMsg{container.HideUI(name)}
 		}
 	case "Start":
 		m.statusMsg = "Starting..."

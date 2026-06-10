@@ -313,11 +313,13 @@ run_weston() {
   export WAYLAND_DISPLAY="$WL_SOCKET"
   echo "[x11droid] weston up on ${WAYLAND_DISPLAY} (${W}x${H})"
   title_window /tmp/weston.log
-  show_ui
+  # Background the session so PID 1 doesn't depend on it — Hide UI / Show UI can
+  # tear down and relaunch the compositor without exiting the entrypoint.
+  show_ui &
 }
 
 run_cage() {
-  cage -s -- bash -lc show_ui
+  cage -s -- bash -lc show_ui &
 }
 
 case "$COMPOSITOR" in
@@ -343,3 +345,12 @@ case "$COMPOSITOR" in
     exit 1
     ;;
 esac
+
+# Keep PID 1 (and thus the container) alive independent of the compositor and
+# Android session, so the window can be closed / hidden / re-shown without
+# tearing the instance down. cleanup() still runs on a real stop (SIGTERM/EXIT).
+# `wait` on a backgrounded sleep keeps bash responsive to those signals.
+while :; do
+  sleep 2147483647 &
+  wait $! || true
+done

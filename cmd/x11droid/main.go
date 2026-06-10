@@ -55,6 +55,7 @@ func rootCmd() *cobra.Command {
 		cmdList(),
 		cmdSpawn(),
 		cmdAttach(),
+		cmdHide(),
 		cmdStart(),
 		cmdStop(),
 		cmdRM(),

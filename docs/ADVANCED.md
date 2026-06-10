@@ -11,6 +11,7 @@ The bare command opens the TUI. Subcommands are scriptable:
 | `list` (`ls`, `ps`) | List all instances with status |
 | `spawn <name> [flags]` | Create and start a new instance |
 | `attach [name]` | List running instances, or (re)open the GUI for one |
+| `hide <name>` | Close the GUI window but keep the instance running (Show UI / `attach` reopens it) |
 | `start <name>` | Start a stopped instance |
 | `stop <name>` | Stop a running instance (5s grace, then force) |
 | `rm <name> [--purge]` (`remove`, `delete`) | Remove an instance; `--purge` also deletes its Android data |

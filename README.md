@@ -142,7 +142,7 @@ x11droid  /  Dashboard
 | View | How to open | Description |
 |------|-------------|-------------|
 | Dashboard | default | All instances with status (auto-refreshes) |
-| Instance | `enter` | Show UI / Start / Stop / Remove / Purge / Shell / Logs |
+| Instance | `enter` | Show UI / Hide UI / Start / Stop / Remove / Purge / Shell / Logs |
 | New Instance | `n` | Name + GApps / ARM / F-Droid / Aurora / Obtainium / Shelter / Dev Options / Root / Persist toggles |
 | Config | `c` | Resolution, orientation, compositor (saved) |
 | Setup | `s` | Module status, image build, sudo modules |
@@ -162,7 +162,7 @@ x11droid  /  Dashboard
 | `tab` | Next field (spawn form) |
 | `q` / `ctrl+c` | Quit |
 
-Instance actions include **Show UI** ((re)open the Android window — it relaunches the compositor if it died, so a black/closed window recovers without a respawn), **Purge** (remove + delete the instance's Android data), and the usual Start/Stop/Remove/Shell/Logs (logs are live).
+Instance actions include **Show UI** ((re)open the Android window — it relaunches the compositor if it died, so a black/closed window recovers without a respawn), **Hide UI** (close the window but keep the instance running, so Show UI brings it back without a fresh spawn), **Purge** (remove + delete the instance's Android data), and the usual Start/Stop/Remove/Shell/Logs (logs are live).
 
 ## Just recipes
 
