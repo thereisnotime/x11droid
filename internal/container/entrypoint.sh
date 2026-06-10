@@ -24,7 +24,10 @@ cleanup() {
   trap - EXIT INT TERM HUP
   waydroid session stop 2>/dev/null || true
   waydroid container stop 2>/dev/null || true
-  killall waydroid cage weston dbus-daemon 2>/dev/null || true
+  # pkill (procps) — psmisc/killall isn't installed in the image.
+  for p in waydroid cage weston dbus-daemon; do
+    pkill -x "$p" 2>/dev/null || killall "$p" 2>/dev/null || true
+  done
 }
 trap cleanup EXIT INT TERM HUP
 
@@ -141,30 +144,51 @@ if [ -n "$ROOT" ] && [ ! -f /var/lib/waydroid/.x11droid-magisk-app ]; then
   ) >/var/lib/waydroid/x11droid-magisk-app.log 2>&1 &
 fi
 
+# wait_for_boot blocks until Android reports boot complete, then waits a little
+# longer for the package/settings services to settle — running `settings put`
+# the instant sys.boot_completed flips races them and silently no-ops.
+wait_for_boot() {
+  local _
+  for _ in $(seq 1 120); do
+    [ "$(waydroid prop get sys.boot_completed 2>/dev/null | tr -d '\r ')" = "1" ] && { sleep 8; return 0; }
+    sleep 5
+  done
+  echo "[x11droid] WARNING: boot did not complete in time" >&2
+  return 1
+}
+
+# put_global sets an Android global setting, retrying until `settings get`
+# confirms it stuck (the settings service rejects writes for a few seconds
+# after boot, which is why the old fire-and-forget put silently failed).
+put_global() {
+  local k="$1" v="$2" i
+  for i in 1 2 3 4 5 6; do
+    waydroid shell settings put global "$k" "$v" >/dev/null 2>&1
+    if [ "$(waydroid shell settings get global "$k" 2>/dev/null | tr -d '\r ')" = "$v" ]; then
+      echo "[x11droid] set global $k=$v"
+      return 0
+    fi
+    sleep 3
+  done
+  echo "[x11droid] WARNING: could not set global $k=$v" >&2
+  return 1
+}
+
 # Device name — set the Android model (CPU-Z / About phone) via
 # waydroid_base.prop, and the Settings "Device name" once booted.
 if [ -n "$DEVICE_NAME" ] && [ "$DEVICE_NAME" != "instance" ] && [ -f /var/lib/waydroid/waydroid_base.prop ]; then
   sed -i '/^ro\.product\.model=/d' /var/lib/waydroid/waydroid_base.prop
   echo "ro.product.model=$DEVICE_NAME" >> /var/lib/waydroid/waydroid_base.prop
-  (
-    for _ in $(seq 1 120); do
-      [ "$(waydroid prop get sys.boot_completed 2>/dev/null | tr -d '\r ')" = "1" ] && break
-      sleep 5
-    done
-    waydroid shell settings put global device_name "$DEVICE_NAME" 2>/dev/null || true
-  ) &
+  ( wait_for_boot && put_global device_name "$DEVICE_NAME" ) \
+    >>/var/lib/waydroid/x11droid-devopts.log 2>&1 &
 fi
 
 # Developer Options — enable the Android dev-settings menu and adb once booted.
 if [ -n "$DEVOPTS" ]; then
-  (
-    for _ in $(seq 1 120); do
-      [ "$(waydroid prop get sys.boot_completed 2>/dev/null | tr -d '\r ')" = "1" ] && break
-      sleep 5
-    done
-    waydroid shell settings put global development_settings_enabled 1 2>/dev/null || true
-    waydroid shell settings put global adb_enabled 1 2>/dev/null || true
-  ) &
+  ( wait_for_boot \
+      && put_global development_settings_enabled 1 \
+      && put_global adb_enabled 1 ) \
+    >>/var/lib/waydroid/x11droid-devopts.log 2>&1 &
 fi
 
 # --- binder via binderfs --------------------------------------------------

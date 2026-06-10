@@ -564,8 +564,11 @@ sleep 1`
 // without a fresh spawn. The container itself stays Up because the entrypoint's
 // supervisor keeps PID 1 alive independent of the compositor.
 func HideUI(name string) error {
+	// pkill (procps), not killall (psmisc) — psmisc isn't installed in the image,
+	// so killall silently fails and weston survives as a black kiosk window.
 	script := `waydroid session stop >/dev/null 2>&1 || true
-killall weston cage >/dev/null 2>&1 || true`
+pkill -x weston 2>/dev/null || killall weston 2>/dev/null || true
+pkill -x cage 2>/dev/null || killall cage 2>/dev/null || true`
 	out, err := podmanCmd("exec", name, "bash", "-lc", script).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("hide-ui %s: %w\n%s", name, err, out)
