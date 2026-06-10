@@ -71,6 +71,48 @@ func cmdSpawn() *cobra.Command {
 	return c
 }
 
+func cmdConfig() *cobra.Command {
+	var width, height int
+	var orientation, compositor string
+	c := &cobra.Command{
+		Use:   "config",
+		Short: "Show or set instance defaults (resolution, orientation, compositor)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg := config.Load()
+			if cmd.Flags().Changed("width") {
+				cfg.Width = width
+			}
+			if cmd.Flags().Changed("height") {
+				cfg.Height = height
+			}
+			if cmd.Flags().Changed("orientation") {
+				cfg.Orientation = orientation
+			}
+			if cmd.Flags().Changed("compositor") {
+				cfg.Compositor = compositor
+			}
+			if cmd.Flags().NFlag() > 0 {
+				if err := cfg.Save(); err != nil {
+					return err
+				}
+				cfg = config.Load() // re-load so normalized values show
+			}
+			ew, eh := cfg.EffectiveDims()
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+			twPrintf(w, "resolution\t%dx%d\n", cfg.Width, cfg.Height)
+			twPrintf(w, "orientation\t%s\n", cfg.Orientation)
+			twPrintf(w, "compositor\t%s\n", cfg.Compositor)
+			twPrintf(w, "window\t%dx%d\n", ew, eh)
+			return w.Flush()
+		},
+	}
+	c.Flags().IntVar(&width, "width", 0, "portrait width")
+	c.Flags().IntVar(&height, "height", 0, "portrait height")
+	c.Flags().StringVar(&orientation, "orientation", "", "portrait|landscape")
+	c.Flags().StringVar(&compositor, "compositor", "", "auto|weston|cage")
+	return c
+}
+
 func cmdVersion() *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",

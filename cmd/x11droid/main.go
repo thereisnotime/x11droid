@@ -35,7 +35,7 @@ func rootCmd() *cobra.Command {
 			// and cleanly rather than limping into a cryptic podman failure.
 			// The read-only commands stay usable without root.
 			switch cmd.Name() {
-			case "version", "help", "status":
+			case "version", "help", "status", "config":
 				return nil
 			}
 			if !system.IsRoot() {
@@ -59,6 +59,7 @@ func rootCmd() *cobra.Command {
 		cmdRM(),
 		cmdLogs(),
 		cmdShell(),
+		cmdConfig(),
 		cmdSetup(),
 		cmdVersion(),
 	)
