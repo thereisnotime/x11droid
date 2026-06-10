@@ -70,7 +70,9 @@ The container entrypoint is `internal/container/entrypoint.sh` (embedded in the 
 
 ## Root (Magisk)
 
-The **Root** toggle (or `--root`) installs **Magisk** via [waydroid_script](https://github.com/casualsnek/waydroid_script) on first boot (one-time, marked done in the data dir; install failures are logged to `instances/<name>/x11droid-magisk.log`). Open the Magisk app afterwards to grant `su` to apps that request it.
+The **Root** toggle (or `--root`) installs **Magisk Delta** via [waydroid_script](https://github.com/casualsnek/waydroid_script) on first boot (one-time, marked done in the data dir; install failures are logged to `instances/<name>/x11droid-magisk.log`). The `su` daemon (magiskd) comes up at boot regardless — verify with `just adb <name>` then `su -c id`.
+
+waydroid_script only pre-seeds the manager apk into the overlay, so the daemon logs `pkg: cannot find io.github.huskydg.magisk` and the **Magisk app won't open / show as rooted**. x11droid works around this by installing the bundled apk properly via PackageManager once Android finishes booting (logged to `instances/<name>/x11droid-magisk-app.log`, marked with `.x11droid-magisk-app`). If the app still misbehaves on an instance created before this fix, respawn it or reinstall the apk: `just apk <name> <path-to-magisk.apk>`.
 
 Root won't pass Play Integrity / SafetyNet — Magisk is detectable here and there's no hardware-backed attestation in waydroid.
 

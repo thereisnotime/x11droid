@@ -19,6 +19,7 @@ type Instance struct {
 	Status  string
 	Image   string
 	Created string // formatted creation time
+	RAM     string // memory used (running only; "-" otherwise)
 }
 
 type podmanPS struct {
@@ -212,6 +213,8 @@ func List() ([]Instance, error) {
 		return nil, fmt.Errorf("parse podman output: %w", err)
 	}
 
+	stats := memStats() // one batched stats call for all running containers
+
 	instances := make([]Instance, 0, len(raw))
 	for _, r := range raw {
 		name := r.ID[:12]
@@ -222,15 +225,39 @@ func List() ([]Instance, error) {
 		if r.Created > 0 {
 			created = time.Unix(r.Created, 0).Format("2006-01-02 15:04")
 		}
+		ram := "-"
+		if v, ok := stats[name]; ok && v != "" {
+			// keep just the "used" half of "used / limit" for a compact column
+			ram = strings.TrimSpace(strings.SplitN(v, "/", 2)[0])
+		}
 		instances = append(instances, Instance{
 			Name:    name,
 			ID:      r.ID[:12],
 			Status:  r.Status,
 			Image:   r.Image,
 			Created: created,
+			RAM:     ram,
 		})
 	}
 	return instances, nil
+}
+
+// memStats returns a name→memory-usage map for all running containers from a
+// single `podman stats` call — cheaper than one call per instance when
+// building the dashboard list. Stopped containers simply won't appear.
+func memStats() map[string]string {
+	out, err := podmanCmd("stats", "--no-stream", "--format", "{{.Name}}\t{{.MemUsage}}").Output()
+	if err != nil {
+		return nil
+	}
+	m := map[string]string{}
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		parts := strings.SplitN(line, "\t", 2)
+		if len(parts) == 2 {
+			m[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+		}
+	}
+	return m
 }
 
 // SpawnOpts holds the configuration for a new instance.

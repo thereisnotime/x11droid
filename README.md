@@ -130,8 +130,8 @@ x11droid  /  Dashboard
 ┌─────────────────────────────────────────────────────────┐
 │ Instances (2)                                           │
 │                                                         │
-│ ▶ pixel9          a1b2c3d4e5f6  Up 2 hours    x11droid  │
-│   pixel9-gapps    b2c3d4e5f6a1  Exited (0)   x11droid  │
+│ ▶ pixel9        a1b2c3d4e5f6  812MB  Up 2 hours  x11droid│
+│   pixel9-gapps  b2c3d4e5f6a1  -      Exited (0)  x11droid│
 │                                                         │
 └─────────────────────────────────────────────────────────┘
 ↑↓ navigate  enter select  n new  s setup  r refresh  q quit

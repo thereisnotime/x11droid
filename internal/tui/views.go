@@ -85,12 +85,14 @@ func renderMain(m Model) string {
 	for i, inst := range m.instances {
 		name := padRight(inst.Name, 24)
 		id := padRight(inst.ID, 14)
+		ram := padRight(inst.RAM, 10)
 		status := statusLabel(inst.Status)
 		image := styleMuted.Render(truncate(inst.Image, 24))
 
-		row := fmt.Sprintf(" %s  %s  %s  %s",
+		row := fmt.Sprintf(" %s  %s  %s  %s  %s",
 			styleLabel.Render(name),
 			styleMuted.Render(id),
+			styleMuted.Render(ram),
 			status,
 			image,
 		)

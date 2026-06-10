@@ -124,6 +124,23 @@ if [ -n "$ROOT" ] && [ ! -f /var/lib/waydroid/.x11droid-magisk ]; then
   cd / || true
 fi
 
+# Register the Magisk manager app with PackageManager. waydroid_script only
+# pre-seeds the apk into the overlay, so the magisk daemon boots but logs
+# "pkg: cannot find io.github.huskydg.magisk" and the app won't open / show as
+# rooted. Installing the bundled apk properly once Android is up fixes that.
+if [ -n "$ROOT" ] && [ ! -f /var/lib/waydroid/.x11droid-magisk-app ]; then
+  (
+    for _ in $(seq 1 120); do
+      [ "$(waydroid prop get sys.boot_completed 2>/dev/null | tr -d '\r ')" = "1" ] && break
+      sleep 5
+    done
+    apk=/var/lib/waydroid/overlay/system/etc/init/magisk/magisk.apk
+    [ -f "$apk" ] && waydroid app install "$apk" \
+      && touch /var/lib/waydroid/.x11droid-magisk-app \
+      && echo "[x11droid] Magisk manager app registered"
+  ) >/var/lib/waydroid/x11droid-magisk-app.log 2>&1 &
+fi
+
 # Device name — set the Android model (CPU-Z / About phone) via
 # waydroid_base.prop, and the Settings "Device name" once booted.
 if [ -n "$DEVICE_NAME" ] && [ "$DEVICE_NAME" != "instance" ] && [ -f /var/lib/waydroid/waydroid_base.prop ]; then
