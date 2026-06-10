@@ -211,6 +211,7 @@ func Spawn(opts SpawnOpts) error {
 	// root's, so DISPLAY/XAUTHORITY/XDG_RUNTIME_DIR must come from SUDO_USER.
 	hu := system.ResolveHostUser()
 	display := hu.Display
+	xdgRuntime := hu.RuntimeDir
 	xauth := hu.XAuthority
 
 	args := []string{
@@ -235,14 +236,15 @@ func Spawn(opts SpawnOpts) error {
 		// Name available to the entrypoint for the weston window title.
 		"-e", fmt.Sprintf("X11DROID_NAME=%s", opts.Name),
 		"-e", fmt.Sprintf("DISPLAY=%s", display),
-		// Private, container-local runtime dir (the entrypoint creates it) so
-		// each instance's weston wayland socket is isolated — sharing the host
-		// /run/user/<uid> made a second instance hijack the first's compositor.
-		"-e", "XDG_RUNTIME_DIR=/run/xdg",
+		// Keep the host runtime dir (waydroid's LXC bind-mounts its pulse
+		// socket); weston uses a per-instance socket name (entrypoint) so two
+		// instances don't collide on the shared dir.
+		"-e", fmt.Sprintf("XDG_RUNTIME_DIR=%s", xdgRuntime),
 		"-e", "WLR_BACKENDS=x11",
 		"-e", "WLR_RENDERER=pixman",
 		"-e", "XDG_SESSION_TYPE=x11",
 		"-v", "/tmp/.X11-unix:/tmp/.X11-unix",
+		"-v", fmt.Sprintf("%s:%s", xdgRuntime, xdgRuntime),
 	}
 
 	// Pass each binder node waydroid needs (binder, hwbinder, vndbinder). These
@@ -431,10 +433,12 @@ func ShowUI(name string) error {
 	// the entrypoint's session bus and the compositor's wayland socket, then
 	// background show-full-ui (it blocks while the UI is open) via setsid so it
 	// survives the exec returning.
+	// weston runs with --socket=wl-<name> (per-instance); use that exact name —
+	// globbing the shared XDG_RUNTIME_DIR could grab another instance's socket.
 	script := `pgrep -x weston >/dev/null 2>&1 || pgrep -x cage >/dev/null 2>&1 || ` +
 		`{ echo "compositor is not running — Stop then Start (or respawn) this instance"; exit 1; }
 export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/dbus/session_bus_socket"
-export WAYLAND_DISPLAY="$(basename "$(ls "$XDG_RUNTIME_DIR"/wayland-[0-9]* 2>/dev/null | head -1)")"
+export WAYLAND_DISPLAY="wl-` + name + `"
 setsid waydroid show-full-ui >/dev/null 2>&1 </dev/null &
 sleep 1`
 	out, err := podmanCmd("exec", name, "bash", "-lc", script).CombinedOutput()

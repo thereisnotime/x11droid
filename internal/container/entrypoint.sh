@@ -15,11 +15,10 @@ H="${WAYDROID_HEIGHT:-960}"
 X11DROID_NAME="${X11DROID_NAME:-instance}"
 # Android device/model name — explicit override, else the instance name.
 DEVICE_NAME="${WAYDROID_DEVICE:-$X11DROID_NAME}"
-
-# Private runtime dir for weston's wayland socket — created here (owned by root,
-# mode 0700) so weston is happy and instances don't collide on a shared dir.
-mkdir -p "${XDG_RUNTIME_DIR:-/run/xdg}" 2>/dev/null || true
-chmod 700 "${XDG_RUNTIME_DIR:-/run/xdg}" 2>/dev/null || true
+# Per-instance wayland socket name so multiple instances sharing the host
+# XDG_RUNTIME_DIR don't collide (a shared "wayland-1" let a second instance
+# hijack the first's compositor).
+WL_SOCKET="wl-${X11DROID_NAME}"
 
 cleanup() {
   trap - EXIT INT TERM HUP
@@ -296,14 +295,16 @@ fi
 run_weston() {
   # kiosk-shell = single fullscreen app, no panel/taskbar/background — the
   # Android window fills the output (what cage would do if it worked on NVIDIA).
-  weston --backend=x11-backend.so --use-pixman --shell=kiosk-shell.so --width="$W" --height="$H" >/tmp/weston.log 2>&1 &
+  # --socket gives this instance a unique wayland socket so it doesn't collide
+  # with another instance in the shared XDG_RUNTIME_DIR.
+  weston --backend=x11-backend.so --use-pixman --shell=kiosk-shell.so \
+    --socket="$WL_SOCKET" --width="$W" --height="$H" >/tmp/weston.log 2>&1 &
   for _ in $(seq 1 30); do
-    ls "$XDG_RUNTIME_DIR"/wayland-[0-9]* >/dev/null 2>&1 && break
+    [ -S "$XDG_RUNTIME_DIR/$WL_SOCKET" ] && break
     sleep 0.5
   done
-  WAYLAND_DISPLAY="$(basename "$(ls "$XDG_RUNTIME_DIR"/wayland-[0-9]* 2>/dev/null | head -1)")"
-  export WAYLAND_DISPLAY
-  echo "[x11droid] weston up on ${WAYLAND_DISPLAY:-?} (${W}x${H})"
+  export WAYLAND_DISPLAY="$WL_SOCKET"
+  echo "[x11droid] weston up on ${WAYLAND_DISPLAY} (${W}x${H})"
   title_window /tmp/weston.log
   show_ui
 }
