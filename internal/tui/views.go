@@ -216,11 +216,15 @@ func renderSpawn(m Model) string {
 	sb.WriteString("\n\n")
 	sb.WriteString(toggle(m.spawnShelter, m.spawnCursor, 7, "Shelter", "install Shelter after first boot"))
 	sb.WriteString("\n\n")
-	sb.WriteString(toggle(m.spawnPV, m.spawnCursor, 8, "Persist", "keep Android data between container restarts"))
+	sb.WriteString(toggle(m.spawnDevOptions, m.spawnCursor, 8, "Dev Options", "enable Android Developer Options"))
+	sb.WriteString("\n\n")
+	sb.WriteString(toggle(m.spawnRoot, m.spawnCursor, 9, "Root", "install Magisk (root) on first boot"))
+	sb.WriteString("\n\n")
+	sb.WriteString(toggle(m.spawnPV, m.spawnCursor, 10, "Persist", "keep Android data between container restarts"))
 	sb.WriteString("\n\n")
 
 	var submitBtn string
-	if m.spawnCursor == 9 {
+	if m.spawnCursor == 11 {
 		submitBtn = styleActionSelected.Render("  Spawn  ")
 	} else {
 		submitBtn = styleAction.Foreground(colorSubtext).Render("  Spawn  ")

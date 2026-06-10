@@ -74,6 +74,12 @@ Read `~/.config/x11droid/instances/<name>/x11droid-libndk.log`. It runs `waydroi
 
 ---
 
+## Magisk (root) install failed
+
+Same as libndk above, but read `~/.config/x11droid/instances/<name>/x11droid-magisk.log`. One-time; the marker `.x11droid-magisk` in the data dir means it succeeded. Open the Magisk app to grant `su`.
+
+---
+
 ## Container stuck in "Stopping", can't Start
 
 **Cause:** waydroid's loop mounts + Android LXC don't always tear down cleanly, so podman can't finish stopping.

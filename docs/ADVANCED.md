@@ -30,6 +30,8 @@ The bare command opens the TUI. Subcommands are scriptable:
 | `--aurora` | off | Install Aurora Store after first boot |
 | `--obtainium` | off | Install Obtainium after first boot |
 | `--shelter` | off | Install Shelter after first boot |
+| `--dev-options` | off | Enable Android Developer Options on first boot |
+| `--root` | off | Install Magisk (root) on first boot |
 | `--no-pv` | off | Disable the persistent volume (data won't survive removal) |
 
 Resolution / orientation / compositor come from the saved **Config** (TUI: `c`), persisted to `~/.config/x11droid/config.json`.
@@ -62,6 +64,18 @@ The container entrypoint is `internal/container/entrypoint.sh` (embedded in the 
 
 - The **F-Droid**, **Aurora**, and **Shelter** toggles each install that app from the F-Droid repo (current version resolved via its API); **Obtainium** installs the native x86_64 build from GitHub releases. Only the toggles you enable are installed, once Android finishes booting. One-time, marked done in the data dir.
 - The **ARM** toggle installs **libndk** via [waydroid_script](https://github.com/casualsnek/waydroid_script) on first boot. Needed for apps (and GApps services) that ship ARM-only native libraries — it translates ARM→x86 per-app. The base system stays native x86 (fast).
+
+## Root (Magisk)
+
+The **Root** toggle (or `--root`) installs **Magisk** via [waydroid_script](https://github.com/casualsnek/waydroid_script) on first boot (one-time, marked done in the data dir; install failures are logged to `instances/<name>/x11droid-magisk.log`). Open the Magisk app afterwards to grant `su` to apps that request it.
+
+Root won't pass Play Integrity / SafetyNet — Magisk is detectable here and there's no hardware-backed attestation in waydroid.
+
+## Developer Options
+
+The **Dev Options** toggle (or `--dev-options`) flips `development_settings_enabled` and `adb_enabled` once Android finishes booting, so the Developer Options menu and adb are available without tapping the build number seven times.
+
+To open an interactive Android root shell in a running instance: `just adb <name>` (runs `waydroid shell` inside the container).
 
 ## Device naming / spoofing
 

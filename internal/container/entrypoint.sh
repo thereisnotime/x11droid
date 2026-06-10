@@ -7,6 +7,8 @@ set -u
 COMPOSITOR="${WAYDROID_COMPOSITOR:-auto}"
 GAPPS="${WAYDROID_GAPPS:-}"
 HIDEARM="${WAYDROID_HIDEARM:-}"
+ROOT="${WAYDROID_ROOT:-}"
+DEVOPTS="${WAYDROID_DEVOPTS:-}"
 APPS="${WAYDROID_APPS:-}"
 W="${WAYDROID_WIDTH:-540}"
 H="${WAYDROID_HEIGHT:-960}"
@@ -93,6 +95,24 @@ if [ -n "$HIDEARM" ] && [ ! -f /var/lib/waydroid/.x11droid-libndk ]; then
   cd / || true
 fi
 
+# Magisk (root) via waydroid_script. One-time per instance; marked done so
+# reboots skip it. Open the Magisk app afterwards to grant su.
+if [ -n "$ROOT" ] && [ ! -f /var/lib/waydroid/.x11droid-magisk ]; then
+  echo "[x11droid] installing Magisk (root) — a few minutes..."
+  (
+    export USER=root HOME=/root
+    d=/opt/waydroid_script
+    [ -d "$d/.git" ] || git clone --depth 1 https://github.com/casualsnek/waydroid_script "$d"
+    cd "$d" && \
+    { [ -d venv ] || python3 -m venv venv; } && \
+    venv/bin/pip install -q -r requirements.txt && \
+    venv/bin/python3 main.py install magisk
+  ) >/var/lib/waydroid/x11droid-magisk.log 2>&1 \
+    && { touch /var/lib/waydroid/.x11droid-magisk; echo "[x11droid] Magisk installed"; } \
+    || echo "[x11droid] Magisk install failed — see instances/<name>/x11droid-magisk.log" >&2
+  cd / || true
+fi
+
 # Device name — set the Android model (CPU-Z / About phone) via
 # waydroid_base.prop, and the Settings "Device name" once booted.
 if [ -n "$DEVICE_NAME" ] && [ "$DEVICE_NAME" != "instance" ] && [ -f /var/lib/waydroid/waydroid_base.prop ]; then
@@ -104,6 +124,18 @@ if [ -n "$DEVICE_NAME" ] && [ "$DEVICE_NAME" != "instance" ] && [ -f /var/lib/wa
       sleep 5
     done
     waydroid shell settings put global device_name "$DEVICE_NAME" 2>/dev/null || true
+  ) &
+fi
+
+# Developer Options — enable the Android dev-settings menu and adb once booted.
+if [ -n "$DEVOPTS" ]; then
+  (
+    for _ in $(seq 1 120); do
+      [ "$(waydroid prop get sys.boot_completed 2>/dev/null | tr -d '\r ')" = "1" ] && break
+      sleep 5
+    done
+    waydroid shell settings put global development_settings_enabled 1 2>/dev/null || true
+    waydroid shell settings put global adb_enabled 1 2>/dev/null || true
   ) &
 fi
 

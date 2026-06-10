@@ -101,6 +101,8 @@ type SpawnOpts struct {
 	Aurora     bool   // install Aurora Store after first boot
 	Obtainium  bool   // install Obtainium after first boot
 	Shelter    bool   // install Shelter after first boot
+	DevOptions bool   // enable Android Developer Options on first boot
+	Root       bool   // install Magisk (root) on first boot
 	PV         bool   // use persistent volume for waydroid data
 	Width      int    // compositor window width  (0 = image default)
 	Height     int    // compositor window height (0 = image default)
@@ -224,6 +226,12 @@ func Spawn(opts SpawnOpts) error {
 	}
 	if opts.HideARM {
 		args = append(args, "-e", "WAYDROID_HIDEARM=1")
+	}
+	if opts.DevOptions {
+		args = append(args, "-e", "WAYDROID_DEVOPTS=1")
+	}
+	if opts.Root {
+		args = append(args, "-e", "WAYDROID_ROOT=1")
 	}
 	if apps := selectedApps(opts); apps != "" {
 		args = append(args, "-e", fmt.Sprintf("WAYDROID_APPS=%s", apps))

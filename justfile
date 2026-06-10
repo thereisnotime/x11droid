@@ -68,6 +68,10 @@ image-build:
 image-clean:
     podman rmi -f {{image}}
 
+# open an interactive Android (adb-style) root shell in an instance
+adb name:
+    sudo podman exec -it {{name}} bash -lc 'waydroid shell'
+
 # capture ~25s of android logcat from a running instance to /tmp/lc.txt (debug)
 logcat name:
     -sudo podman exec {{name}} bash -lc 'export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/dbus/session_bus_socket; timeout 25 waydroid logcat' >/tmp/lc.txt 2>&1

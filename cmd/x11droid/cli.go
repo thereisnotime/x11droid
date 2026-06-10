@@ -40,7 +40,7 @@ func cmdList() *cobra.Command {
 }
 
 func cmdSpawn() *cobra.Command {
-	var gapps, hidearm, fdroid, aurora, obtainium, shelter, noPV bool
+	var gapps, hidearm, fdroid, aurora, obtainium, shelter, devOptions, root, noPV bool
 	var deviceName string
 
 	c := &cobra.Command{
@@ -59,6 +59,8 @@ func cmdSpawn() *cobra.Command {
 				Aurora:     aurora,
 				Obtainium:  obtainium,
 				Shelter:    shelter,
+				DevOptions: devOptions,
+				Root:       root,
 				PV:         !noPV,
 				Width:      w,
 				Height:     h,
@@ -73,6 +75,8 @@ func cmdSpawn() *cobra.Command {
 	c.Flags().BoolVar(&aurora, "aurora", false, "install Aurora Store after first boot")
 	c.Flags().BoolVar(&obtainium, "obtainium", false, "install Obtainium after first boot")
 	c.Flags().BoolVar(&shelter, "shelter", false, "install Shelter after first boot")
+	c.Flags().BoolVar(&devOptions, "dev-options", false, "enable Android Developer Options on first boot")
+	c.Flags().BoolVar(&root, "root", false, "install Magisk (root) on first boot")
 	c.Flags().BoolVar(&noPV, "no-pv", false, "disable persistent volume")
 	return c
 }

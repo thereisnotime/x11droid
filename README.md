@@ -22,6 +22,7 @@ Each instance is an isolated Podman container running a nested **weston** compos
 - **Fullscreen Android** via weston kiosk-shell (no panel), titled `x11droid - <name> - weston - Android <ver>`
 - **GApps** (Google Play) and **ARM translation** (libndk) toggles
 - **App toggles** — optionally install any of F-Droid, Aurora, Obtainium, Shelter on first boot
+- **Dev Options** and **Root** (Magisk via waydroid_script) toggles
 - **Custom device name** (sets `ro.product.model`)
 - **Config screen** — resolution, orientation, compositor (persisted)
 - **Purge** to wipe an instance's data; **live logs**; `just logcat <name>` for Android logcat
@@ -139,7 +140,7 @@ x11droid  /  Dashboard
 |------|-------------|-------------|
 | Dashboard | default | All instances with status (auto-refreshes) |
 | Instance | `enter` | Show UI / Start / Stop / Remove / Purge / Shell / Logs |
-| New Instance | `n` | Name + GApps / ARM / F-Droid / Aurora / Obtainium / Shelter / Persist toggles |
+| New Instance | `n` | Name + GApps / ARM / F-Droid / Aurora / Obtainium / Shelter / Dev Options / Root / Persist toggles |
 | Config | `c` | Resolution, orientation, compositor (saved) |
 | Setup | `s` | Module status, image build, sudo modules |
 
