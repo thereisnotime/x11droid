@@ -112,6 +112,25 @@ func renderDetail(m Model) string {
 		sb.WriteString("\n")
 	}
 
+	// Show the full (untruncated) error from the last action — the header only
+	// has room for one truncated line, and these are often multi-line.
+	if m.err != nil {
+		w := m.width - 6
+		if w < 20 {
+			w = 20
+		}
+		box := lipgloss.NewStyle().
+			Foreground(colorRed).
+			Border(lipgloss.NormalBorder(), false, false, false, true).
+			BorderForeground(colorRed).
+			Padding(0, 2).
+			Width(w).
+			Render("error\n" + m.err.Error())
+		sb.WriteString("\n")
+		sb.WriteString(lipgloss.NewStyle().Padding(0, 2).Render(box))
+		sb.WriteString("\n")
+	}
+
 	return sb.String()
 }
 

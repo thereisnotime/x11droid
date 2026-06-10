@@ -247,10 +247,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			m.err = msg.err
 		}
+		// Refresh in the background (bgInstancesMsg) so the list updates without
+		// clobbering an error we just set — fetchInstances would clear m.err
+		// before it could be read.
 		if m.view == viewSetup {
-			return m, tea.Batch(fetchInstances, fetchKernelStatus, fetchImageStatus)
+			return m, tea.Batch(fetchInstancesBg, fetchKernelStatus, fetchImageStatus)
 		}
-		return m, fetchInstances
+		return m, fetchInstancesBg
 
 	case tea.KeyMsg:
 		return m.handleKey(msg)
