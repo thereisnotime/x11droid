@@ -125,6 +125,10 @@ func Spawn(opts SpawnOpts) error {
 		// cgroup controllers — without this its init fails to enable
 		// controllers ("Device or resource busy") and Android boot-loops.
 		"--cgroupns=host",
+		// No PID limit. Podman defaults to 2048; Android (especially with
+		// GApps/GMS) spawns more threads than that, and the overflow surfaces
+		// as "pthread_create failed: Try again" → system_server dies → reboot.
+		"--pids-limit=-1",
 		// Name available to the entrypoint for the weston window title.
 		"-e", fmt.Sprintf("X11DROID_NAME=%s", opts.Name),
 		"-e", fmt.Sprintf("DISPLAY=%s", display),
