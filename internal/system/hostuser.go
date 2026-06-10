@@ -6,6 +6,8 @@ import (
 	"os/user"
 	"path/filepath"
 	"strconv"
+	"strings"
+	"syscall"
 )
 
 // HostUser describes the human user whose X11 session and home directory the
@@ -24,6 +26,48 @@ type HostUser struct {
 
 // IsRoot reports whether the process is running with root privileges.
 func IsRoot() bool { return os.Geteuid() == 0 }
+
+// userXEnv finds the DISPLAY and XAUTHORITY of a live X11 process owned by uid
+// by scanning /proc (readable as root). This locates the real, current session
+// cookie, which display managers often keep outside ~/.Xauthority and rotate.
+func userXEnv(uid int) (display, xauth string) {
+	entries, _ := filepath.Glob("/proc/[0-9]*/environ")
+	var fallbackD, fallbackX string
+	for _, p := range entries {
+		fi, err := os.Stat(filepath.Dir(p))
+		if err != nil {
+			continue
+		}
+		st, ok := fi.Sys().(*syscall.Stat_t)
+		if !ok || int(st.Uid) != uid {
+			continue
+		}
+		data, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		var d, x string
+		for _, kv := range strings.Split(string(data), "\x00") {
+			switch {
+			case strings.HasPrefix(kv, "DISPLAY="):
+				d = strings.TrimPrefix(kv, "DISPLAY=")
+			case strings.HasPrefix(kv, "XAUTHORITY="):
+				x = strings.TrimPrefix(kv, "XAUTHORITY=")
+			}
+		}
+		if d == "" {
+			continue
+		}
+		// Prefer a process that gives us both, and a real local display.
+		if x != "" && strings.HasPrefix(d, ":") {
+			return d, x
+		}
+		if fallbackD == "" {
+			fallbackD, fallbackX = d, x
+		}
+	}
+	return fallbackD, fallbackX
+}
 
 // ResolveHostUser determines the target user's session parameters. Under sudo
 // it uses SUDO_USER/SUDO_UID; otherwise it falls back to the current env.
@@ -56,13 +100,24 @@ func ResolveHostUser() HostUser {
 	}
 
 	display := os.Getenv("DISPLAY")
-	if display == "" {
-		display = ":0" // sudo usually strips DISPLAY; the local session is :0
+	xauth := os.Getenv("XAUTHORITY")
+
+	// Under sudo the process env is root's, so discover the invoking user's live
+	// X session (DISPLAY + the *current* XAUTHORITY, which often isn't
+	// ~/.Xauthority and rotates) by inspecting their processes.
+	if name != "" {
+		if d, x := userXEnv(uid); d != "" {
+			display = d
+			if x != "" {
+				xauth = x
+			}
+		}
 	}
 
-	xauth := os.Getenv("XAUTHORITY")
-	if name != "" || xauth == "" {
-		// Prefer the invoking user's cookie, not root's.
+	if display == "" {
+		display = ":0" // local session fallback
+	}
+	if xauth == "" {
 		xauth = filepath.Join(home, ".Xauthority")
 	}
 
