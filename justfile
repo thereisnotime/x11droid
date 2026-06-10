@@ -25,6 +25,10 @@ default:
     @echo "  \033[32mimage-build\033[0m    podman build -t {{image}}"
     @echo "  \033[32mimage-clean\033[0m    remove the container image"
     @echo ""
+    @echo "\033[1;33m DEBUG\033[0m"
+    @echo "  \033[32madb \033[2m<name>\033[0m     interactive Android root shell (waydroid shell)"
+    @echo "  \033[32mlogcat \033[2m<name>\033[0m  capture ~25s of android logcat to /tmp/lc.txt"
+    @echo ""
     @echo "\033[2m kernel modules are managed in-app: run x11droid, press s (Setup) → Load Modules\033[0m"
 
 build:
