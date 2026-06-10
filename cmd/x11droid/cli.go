@@ -8,8 +8,10 @@ import (
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
+	"github.com/thereisnotime/x11droid/internal/config"
 	"github.com/thereisnotime/x11droid/internal/container"
 	"github.com/thereisnotime/x11droid/internal/kernel"
+	"github.com/thereisnotime/x11droid/internal/version"
 )
 
 // twPrintf writes to a tabwriter, ignoring errors that surface through Flush.
@@ -45,11 +47,16 @@ func cmdSpawn() *cobra.Command {
 		Short: "Create and start a new instance",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg := config.Load()
+			w, h := cfg.EffectiveDims()
 			return container.Spawn(container.SpawnOpts{
-				Name:    args[0],
-				GApps:   gapps,
-				HideARM: hidearm,
-				PV:      !noPV,
+				Name:       args[0],
+				GApps:      gapps,
+				HideARM:    hidearm,
+				PV:         !noPV,
+				Width:      w,
+				Height:     h,
+				Compositor: cfg.Compositor,
 			})
 		},
 	}
@@ -57,6 +64,52 @@ func cmdSpawn() *cobra.Command {
 	c.Flags().BoolVar(&hidearm, "hidearm", false, "enable libndk ARM translation")
 	c.Flags().BoolVar(&noPV, "no-pv", false, "disable persistent volume")
 	return c
+}
+
+func cmdVersion() *cobra.Command {
+	return &cobra.Command{
+		Use:   "version",
+		Short: "Show version, commit and build date",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+			twPrintf(w, "version\t%s\n", version.Version)
+			twPrintf(w, "commit\t%s\n", version.Commit)
+			twPrintf(w, "built\t%s\n", version.Date)
+			return w.Flush()
+		},
+	}
+}
+
+func cmdAttach() *cobra.Command {
+	return &cobra.Command{
+		Use:   "attach [name]",
+		Short: "List running instances, or open the GUI for one",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 1 {
+				fmt.Printf("opening GUI for %s...\n", args[0])
+				return container.ShowUI(args[0])
+			}
+			running, err := container.Running()
+			if err != nil {
+				return err
+			}
+			if len(running) == 0 {
+				fmt.Println("no running instances — start one first, then: x11droid attach <name>")
+				return nil
+			}
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+			twPrintf(w, "NAME\tID\tSTATUS\n")
+			for _, i := range running {
+				twPrintf(w, "%s\t%s\t%s\n", i.Name, i.ID, i.Status)
+			}
+			if err := w.Flush(); err != nil {
+				return err
+			}
+			fmt.Println("\nopen one with: x11droid attach <name>")
+			return nil
+		},
+	}
 }
 
 func cmdStart() *cobra.Command {
@@ -82,15 +135,21 @@ func cmdStop() *cobra.Command {
 }
 
 func cmdRM() *cobra.Command {
-	return &cobra.Command{
+	var purge bool
+	c := &cobra.Command{
 		Use:     "rm <name>",
 		Aliases: []string{"remove", "delete"},
-		Short:   "Remove an instance",
+		Short:   "Remove an instance (optionally its persisted data too)",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if purge {
+				return container.Purge(args[0])
+			}
 			return container.Remove(args[0])
 		},
 	}
+	c.Flags().BoolVar(&purge, "purge", false, "also delete the instance's persisted Android data (~3GB)")
+	return c
 }
 
 func cmdLogs() *cobra.Command {
@@ -134,7 +193,6 @@ func cmdSetup() *cobra.Command {
 	}
 	setup.AddCommand(
 		cmdSetupStatus(),
-		cmdSetupAuth(),
 		cmdSetupLoad(),
 		cmdSetupUnload(),
 		cmdSetupBuild(),
@@ -175,20 +233,6 @@ func cmdSetupStatus() *cobra.Command {
 			twPrintf(w, "x11droid:latest\t%s\n", imageState)
 
 			return w.Flush()
-		},
-	}
-}
-
-func cmdSetupAuth() *cobra.Command {
-	return &cobra.Command{
-		Use:   "auth",
-		Short: "Authenticate sudo for module loading",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c := exec.Command("sudo", "-v")
-			c.Stdin = os.Stdin
-			c.Stdout = os.Stdout
-			c.Stderr = os.Stderr
-			return c.Run()
 		},
 	}
 }

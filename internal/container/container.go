@@ -7,6 +7,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/thereisnotime/x11droid/internal/kernel"
+	"github.com/thereisnotime/x11droid/internal/system"
 )
 
 type Instance struct {
@@ -23,8 +26,10 @@ type podmanPS struct {
 	Image  string   `json:"Image"`
 }
 
-// podmanCmd runs podman rootless. Binder access works because Load() sets
-// /dev/binder permissions to 0666 at module-load time — no sudo needed here.
+// podmanCmd runs the podman CLI directly. x11droid itself must run as root
+// (`sudo x11droid`) because waydroid requires rootful podman — a rootless
+// container cannot associate a loop device (needs real host CAP_SYS_ADMIN) to
+// mount the Android system.img. Running as root makes every podman call rootful.
 func podmanCmd(args ...string) *exec.Cmd {
 	return exec.Command("podman", args...)
 }
@@ -44,9 +49,10 @@ func ImageExistsChecked(image string) (exists, ok bool) {
 	return strings.TrimSpace(string(out)) != "", true
 }
 
-// instanceDataDir returns the persistent data directory for a named instance.
+// instanceDataDir returns the persistent data directory for a named instance,
+// kept under the invoking user's home (not root's) so data is consistent.
 func instanceDataDir(name string) string {
-	home, _ := os.UserHomeDir()
+	home := system.ResolveHostUser().Home
 	return filepath.Join(home, ".config", "x11droid", "instances", name)
 }
 
@@ -87,42 +93,66 @@ func List() ([]Instance, error) {
 
 // SpawnOpts holds the configuration for a new instance.
 type SpawnOpts struct {
-	Name    string
-	GApps   bool
-	HideARM bool // install libndk ARM translation layer
-	PV      bool // use persistent volume for waydroid data
+	Name       string
+	GApps      bool
+	HideARM    bool   // install libndk ARM translation layer
+	PV         bool   // use persistent volume for waydroid data
+	Width      int    // compositor window width  (0 = image default)
+	Height     int    // compositor window height (0 = image default)
+	Compositor string // "", "auto", "weston" or "cage"
 }
 
 func Spawn(opts SpawnOpts) error {
-	display := os.Getenv("DISPLAY")
-	if display == "" {
-		display = ":0"
-	}
-	xdgRuntime := os.Getenv("XDG_RUNTIME_DIR")
-	if xdgRuntime == "" {
-		xdgRuntime = fmt.Sprintf("/run/user/%d", os.Getuid())
-	}
-	xauth := os.Getenv("XAUTHORITY")
-	if xauth == "" {
-		home, _ := os.UserHomeDir()
-		xauth = filepath.Join(home, ".Xauthority")
-	}
+	// Resolve the invoking user's X session — under sudo the process env is
+	// root's, so DISPLAY/XAUTHORITY/XDG_RUNTIME_DIR must come from SUDO_USER.
+	hu := system.ResolveHostUser()
+	display := hu.Display
+	xdgRuntime := hu.RuntimeDir
+	xauth := hu.XAuthority
 
 	args := []string{
 		"run", "-d",
 		"--name", opts.Name,
 		"--label", "x11droid=true",
 		"--privileged",
-		"--device", "/dev/binder",
-		"--network=host",
+		// NOT --network=host: waydroid needs its own netns to create the
+		// waydroid0 bridge (rootless can't modify the host netns). X11 reaches
+		// the host over the mounted /tmp/.X11-unix socket, not the network.
+		// Share the host IPC namespace so the compositor's MIT-SHM / pixman
+		// buffers can be shared with the host X server.
+		"--ipc=host",
 		"-e", fmt.Sprintf("DISPLAY=%s", display),
 		"-e", fmt.Sprintf("XDG_RUNTIME_DIR=%s", xdgRuntime),
-		"-e", "WAYLAND_DISPLAY=wayland-0",
 		"-e", "WLR_BACKENDS=x11",
 		"-e", "WLR_RENDERER=pixman",
 		"-e", "XDG_SESSION_TYPE=x11",
 		"-v", "/tmp/.X11-unix:/tmp/.X11-unix",
 		"-v", fmt.Sprintf("%s:%s", xdgRuntime, xdgRuntime),
+	}
+
+	// Pass each binder node waydroid needs (binder, hwbinder, vndbinder). These
+	// only exist if the module was loaded with the devices parameter — see
+	// kernel.Load(). Skip any that are missing rather than failing the run.
+	for _, dev := range kernel.BinderDeviceNodes() {
+		if _, err := os.Stat(dev); err == nil {
+			args = append(args, "--device", dev)
+		}
+	}
+
+	// Hand the GPU render node to the container when present — cage's GBM path
+	// needs it on mesa systems; weston's pixman path ignores it harmlessly.
+	if _, err := os.Stat("/dev/dri"); err == nil {
+		args = append(args, "--device", "/dev/dri")
+	}
+
+	if opts.Width > 0 {
+		args = append(args, "-e", fmt.Sprintf("WAYDROID_WIDTH=%d", opts.Width))
+	}
+	if opts.Height > 0 {
+		args = append(args, "-e", fmt.Sprintf("WAYDROID_HEIGHT=%d", opts.Height))
+	}
+	if opts.Compositor != "" {
+		args = append(args, "-e", fmt.Sprintf("WAYDROID_COMPOSITOR=%s", opts.Compositor))
 	}
 
 	// Inject a fake modprobe so waydroid init doesn't fail looking for it —
@@ -186,12 +216,58 @@ func Remove(name string) error {
 	return nil
 }
 
+// Purge removes the container and deletes its persistent data directory
+// (the Android images + waydroid state), giving a fully clean slate. Removing
+// the container is best-effort so a leftover data dir can still be cleared.
+func Purge(name string) error {
+	rmErr := Remove(name)
+	dir := instanceDataDir(name)
+	// We run as root, so we can delete the root-owned files the container wrote.
+	if err := os.RemoveAll(dir); err != nil {
+		return fmt.Errorf("remove data dir %s: %w", dir, err)
+	}
+	return rmErr
+}
+
 func Logs(name string) (string, error) {
 	out, err := podmanCmd("logs", "--tail", "200", name).CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("podman logs %s: %w", name, err)
 	}
 	return string(out), nil
+}
+
+// IsRunning reports whether an instance's container is currently up.
+func (i Instance) IsRunning() bool {
+	return strings.HasPrefix(i.Status, "Up")
+}
+
+// Running returns only the instances whose container is currently up.
+func Running() ([]Instance, error) {
+	all, err := List()
+	if err != nil {
+		return nil, err
+	}
+	var up []Instance
+	for _, i := range all {
+		if i.IsRunning() {
+			up = append(up, i)
+		}
+	}
+	return up, nil
+}
+
+// ShowUI (re)opens the Android UI window for a running instance by asking
+// waydroid to show the full UI on the compositor already running inside it.
+func ShowUI(name string) error {
+	// Discover the compositor's wayland socket inside the container, then show
+	// the UI — covers both weston (wayland-N) and cage.
+	script := `export WAYLAND_DISPLAY="$(basename "$(ls "$XDG_RUNTIME_DIR"/wayland-[0-9]* 2>/dev/null | head -1)")"; waydroid show-full-ui`
+	out, err := podmanCmd("exec", name, "bash", "-lc", script).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("show-full-ui %s: %w\n%s", name, err, out)
+	}
+	return nil
 }
 
 func ImageExists(image string) bool {

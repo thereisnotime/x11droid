@@ -83,23 +83,21 @@ graph TD
 
 ## Quick start
 
-```bash
-# 1. load kernel modules
-just modules-load
-
-# 2. build the container image (~500MB, takes a few minutes)
-just image-build
-
-# 3. run the TUI
-just run
-```
-
-Or do steps 1+2 in one go:
+x11droid must run as **root** (`sudo`): waydroid needs rootful podman to loop-mount
+the Android system image — rootless podman cannot, even `--privileged`.
 
 ```bash
-just setup
-just run
+# 1. build + install the binary to /usr/local/bin
+just build && just install
+
+# 2. run as root
+sudo x11droid
 ```
+
+In the app: press `s` (Setup) → **Build Image** (first time, ~500MB), then **Load Modules**,
+then `n` to create an instance. The Setup screen shows module/image status. Running under
+`sudo`, the app targets your X11 display (`:0`) and home directory automatically; no manual
+`sudo podman` or credential caching is needed.
 
 ## TUI
 
@@ -143,17 +141,17 @@ x11droid  /  Dashboard
 ```
 just build          build the binary
 just run            build and run the TUI
-just install        install to $GOPATH/bin
-just setup          load modules + build image
-just modules-load   sudo modprobe binder_linux (+ ashmem_linux)
-just modules-unload sudo rmmod
-just modules-status check loaded modules
+just install        install to ~/.local/bin
 just image-build    podman build -t x11droid:latest
 just image-clean    remove the container image
+just check          vet + test + lint
 just tidy           go mod tidy
 just vet            go vet ./...
 just clean          remove built binary
 ```
+
+Kernel modules are managed inside the app (Setup screen) or via `x11droid setup load`,
+not through `just`.
 
 ## ARM translation (optional)
 
@@ -177,8 +175,8 @@ sudo venv/bin/python3 main.py install libndk
 # stop and remove all x11droid containers
 podman ps -a --filter label=x11droid=true --format '{{.Names}}' | xargs -r podman rm -f
 
-# unload kernel modules
-just modules-unload
+# unload kernel modules (or use the app: Setup → Unload Modules)
+x11droid setup unload
 
 # remove the image
 just image-clean

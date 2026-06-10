@@ -5,7 +5,9 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/thereisnotime/x11droid/internal/config"
 	"github.com/thereisnotime/x11droid/internal/kernel"
+	"github.com/thereisnotime/x11droid/internal/version"
 )
 
 func renderMain(m Model) string {
@@ -116,7 +118,7 @@ func renderDetail(m Model) string {
 func renderLogs(m Model) string {
 	var sb strings.Builder
 	sb.WriteString(lipgloss.NewStyle().Padding(1, 2).Bold(true).Foreground(colorSubtext).Render(
-		fmt.Sprintf("Logs: %s  (any key to close)", m.selected.Name),
+		fmt.Sprintf("Logs: %s  (live · any key to close)", m.selected.Name),
 	))
 	sb.WriteString("\n")
 
@@ -235,6 +237,66 @@ func renderSetup(m Model) string {
 	return sb.String()
 }
 
+func renderConfig(m Model) string {
+	var sb strings.Builder
+	pad := lipgloss.NewStyle().Padding(0, 3)
+	label := lipgloss.NewStyle().Foreground(colorSubtext).Width(13)
+
+	sb.WriteString(lipgloss.NewStyle().Padding(1, 2).Bold(true).Foreground(colorSubtext).Render("Instance Defaults"))
+	sb.WriteString("\n")
+	sb.WriteString(lipgloss.NewStyle().Padding(0, 2).Foreground(colorMuted).Render(
+		"Applied to every new instance. ←→ or space to change, enter on Save to persist."))
+	sb.WriteString("\n\n")
+
+	field := func(idx int, name, value, hint string) string {
+		valStyle := styleAction.Foreground(colorSubtext)
+		if m.configCursor == idx {
+			valStyle = styleActionSelected
+		}
+		row := lipgloss.JoinHorizontal(lipgloss.Center,
+			label.Render(name),
+			valStyle.Render(" "+value+" "),
+		)
+		if hint != "" {
+			row = lipgloss.JoinHorizontal(lipgloss.Center, row,
+				lipgloss.NewStyle().Foreground(colorMuted).Render("  "+hint))
+		}
+		return pad.Render(row)
+	}
+
+	w, h := m.cfg.EffectiveDims()
+	sb.WriteString(field(0, "Resolution", fmt.Sprintf("%dx%d", m.cfg.Width, m.cfg.Height),
+		fmt.Sprintf("portrait dimensions (window opens %dx%d)", w, h)))
+	sb.WriteString("\n\n")
+	sb.WriteString(field(1, "Orientation", m.cfg.Orientation, ""))
+	sb.WriteString("\n\n")
+	sb.WriteString(field(2, "Compositor", m.cfg.Compositor, compositorHint(m.cfg.Compositor)))
+	sb.WriteString("\n\n")
+
+	var saveBtn string
+	if m.configCursor == 3 {
+		saveBtn = styleActionSelected.Render("  Save  ")
+	} else {
+		saveBtn = styleAction.Foreground(colorSubtext).Render("  Save  ")
+	}
+	sb.WriteString(pad.Render(lipgloss.JoinHorizontal(lipgloss.Center, label.Render(""), saveBtn)))
+	sb.WriteString("\n")
+
+	return sb.String()
+}
+
+func compositorHint(c string) string {
+	switch c {
+	case config.CompositorAuto:
+		return "try cage, fall back to weston (recommended)"
+	case config.CompositorWeston:
+		return "pixman X11 backend — works on NVIDIA"
+	case config.CompositorCage:
+		return "kiosk wlroots — needs mesa GPU"
+	}
+	return ""
+}
+
 func renderHelp(m Model) string {
 	var sb strings.Builder
 	pad := lipgloss.NewStyle().Padding(0, 2)
@@ -263,7 +325,9 @@ func renderHelp(m Model) string {
 	sb.WriteString(row("enter", "open instance detail"))
 	sb.WriteString(row("n", "new instance (spawn form)"))
 	sb.WriteString(row("s", "open setup screen"))
+	sb.WriteString(row("c", "open config screen"))
 	sb.WriteString(row("r", "refresh instance list"))
+	sb.WriteString(row("", "  (the list also auto-refreshes every few seconds)"))
 	sb.WriteString("\n")
 
 	// Instance detail
@@ -271,11 +335,13 @@ func renderHelp(m Model) string {
 	sb.WriteString("\n")
 	sb.WriteString(row("↑ / ↓  or  k / j", "navigate actions"))
 	sb.WriteString(row("enter", "run selected action"))
+	sb.WriteString(row("", "  Show UI — (re)open the Android window"))
 	sb.WriteString(row("", "  Start   — start a stopped container"))
 	sb.WriteString(row("", "  Stop    — stop a running container"))
 	sb.WriteString(row("", "  Remove  — force-remove the container"))
+	sb.WriteString(row("", "  Purge   — remove container + delete its Android data"))
 	sb.WriteString(row("", "  Shell   — open bash inside container"))
-	sb.WriteString(row("", "  Logs    — tail last 100 log lines"))
+	sb.WriteString(row("", "  Logs    — tail logs (auto-refreshes while open)"))
 	sb.WriteString("\n")
 
 	// Spawn
@@ -287,14 +353,26 @@ func renderHelp(m Model) string {
 	sb.WriteString(row("ctrl+u", "clear name input"))
 	sb.WriteString("\n")
 
+	// Config
+	sb.WriteString(heading.Render("Config"))
+	sb.WriteString("\n")
+	sb.WriteString(row("↑ / ↓", "navigate fields"))
+	sb.WriteString(row("← / →  or  space", "change focused value"))
+	sb.WriteString(row("enter", "save (when Save is focused)"))
+	sb.WriteString(row("", "  Resolution  — portrait window size"))
+	sb.WriteString(row("", "  Orientation — portrait / landscape"))
+	sb.WriteString(row("", "  Compositor  — auto / weston / cage"))
+	sb.WriteString("\n")
+
 	// Setup
 	sb.WriteString(heading.Render("Setup"))
 	sb.WriteString("\n")
 	sb.WriteString(row("↑ / ↓", "navigate actions"))
 	sb.WriteString(row("enter", "run selected action"))
-	sb.WriteString(row("", "  Load Modules   — sudo modprobe binder_linux + chmod 0666 /dev/binder"))
-	sb.WriteString(row("", "  Unload Modules    — sudo rmmod binder_linux"))
-	sb.WriteString(row("", "  Build Image       — podman build x11droid:latest"))
+	sb.WriteString(row("", "  Authenticate sudo — cache sudo creds (rootful podman needs it)"))
+	sb.WriteString(row("", "  Load Modules      — ensure binder_linux is loaded"))
+	sb.WriteString(row("", "  Unload Modules    — rmmod binder_linux"))
+	sb.WriteString(row("", "  Build Image       — sudo podman build x11droid:latest"))
 	sb.WriteString(row("", "  Refresh           — re-check status"))
 	sb.WriteString("\n")
 
@@ -340,6 +418,8 @@ func renderHelp(m Model) string {
 		imgStyle = imgStyle.Foreground(colorRed)
 	}
 	sb.WriteString(pad.Render(infoKey.Render("container image")+imgStyle.Render(imgLabel)) + "\n")
+
+	sb.WriteString(pad.Render(infoKey.Render("version")+lipgloss.NewStyle().Foreground(colorMuted).Render(version.String())) + "\n")
 
 	if w := m.session.Warning(); w != "" {
 		sb.WriteString("\n")

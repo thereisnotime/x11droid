@@ -38,3 +38,32 @@ func TestPodmanInstalled(t *testing.T) {
 	// Just verify the function doesn't panic.
 	_ = PodmanInstalled()
 }
+
+func TestInstanceIsRunning(t *testing.T) {
+	cases := []struct {
+		status string
+		want   bool
+	}{
+		{"Up 2 hours", true},
+		{"Up About a minute", true},
+		{"Exited (0) 3 minutes ago", false},
+		{"Exited (1) 5 seconds ago", false},
+		{"Created", false},
+		{"", false},
+	}
+	for _, c := range cases {
+		got := Instance{Status: c.status}.IsRunning()
+		if got != c.want {
+			t.Errorf("Instance{Status:%q}.IsRunning() = %v, want %v", c.status, got, c.want)
+		}
+	}
+}
+
+func TestSpawnOptsZeroValueDefaults(t *testing.T) {
+	// A zero-value SpawnOpts must leave dimensions/compositor unset so the
+	// container image falls back to its own defaults.
+	var o SpawnOpts
+	if o.Width != 0 || o.Height != 0 || o.Compositor != "" {
+		t.Errorf("zero SpawnOpts should have no overrides, got %+v", o)
+	}
+}

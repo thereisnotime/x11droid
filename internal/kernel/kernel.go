@@ -13,6 +13,14 @@ import (
 var required = []string{"binder_linux"}
 var optional = []string{"ashmem_linux"}
 
+// binderDevices are the device nodes waydroid expects. Kernels built with an
+// empty CONFIG_ANDROID_BINDER_DEVICES create none of them unless binder_linux
+// is loaded with devices=binder,hwbinder,vndbinder.
+var binderDevices = []string{"/dev/binder", "/dev/hwbinder", "/dev/vndbinder"}
+
+// BinderDeviceNodes returns the device nodes waydroid needs.
+func BinderDeviceNodes() []string { return binderDevices }
+
 type ModuleState int
 
 const (
@@ -64,21 +72,20 @@ func AllLoaded() bool {
 	return true
 }
 
+// Load ensures binder_linux is loaded so binderfs is available. The container
+// provisions its own binder nodes via binderfs (this kernel ships
+// CONFIG_ANDROID_BINDER_DEVICES="" and creates none statically), so no device
+// parameter or chmod is needed on the host. Runs as root — x11droid runs under
+// sudo — so no sudo prefix.
 func Load() error {
-	mods := append(required, optional...)
-	for _, m := range mods {
-		out, err := exec.Command("sudo", "modprobe", m).CombinedOutput()
+	if !loadedModules()["binder_linux"] {
+		out, err := exec.Command("modprobe", "binder_linux").CombinedOutput()
 		if err != nil {
-			if m != required[0] && strings.Contains(string(out), "not found") {
-				continue
-			}
-			return fmt.Errorf("modprobe %s: %w\n%s", m, err, out)
+			return fmt.Errorf("modprobe binder_linux: %w\n%s", err, out)
 		}
 	}
-	// Make /dev/binder world-accessible so rootless podman can use it.
-	if out, err := exec.Command("sudo", "chmod", "0666", "/dev/binder").CombinedOutput(); err != nil {
-		return fmt.Errorf("chmod /dev/binder: %w\n%s", err, out)
-	}
+	// ashmem_linux is optional — absent (built-in) on kernels >= 5.18.
+	_ = exec.Command("modprobe", "ashmem_linux").Run()
 	return nil
 }
 
@@ -86,7 +93,7 @@ func Unload() error {
 	mods := append(required, optional...)
 	for i := len(mods) - 1; i >= 0; i-- {
 		m := mods[i]
-		out, err := exec.Command("sudo", "rmmod", m).CombinedOutput()
+		out, err := exec.Command("rmmod", m).CombinedOutput()
 		if err != nil {
 			if strings.Contains(string(out), "not currently loaded") ||
 				strings.Contains(string(out), "not found") {

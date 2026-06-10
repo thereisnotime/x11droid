@@ -2,6 +2,7 @@ go   := "asdf exec go"
 lint := "asdf exec golangci-lint"
 binary := "x11droid"
 image  := "x11droid:latest"
+vpkg   := "github.com/thereisnotime/x11droid/internal/version"
 
 # show this help
 default:
@@ -9,7 +10,7 @@ default:
     @echo "\033[1;33m BUILD\033[0m"
     @echo "  \033[32mbuild\033[0m          compile the binary"
     @echo "  \033[32mrun\033[0m            build and launch the TUI"
-    @echo "  \033[32minstall\033[0m        build and copy to ~/.local/bin"
+    @echo "  \033[32minstall\033[0m        install binary to /usr/local/bin (sudo)"
     @echo "  \033[32mclean\033[0m          remove built binary"
     @echo "  \033[32mtidy\033[0m           go mod tidy"
     @echo ""
@@ -20,27 +21,26 @@ default:
     @echo "  \033[32mvet\033[0m            go vet ./..."
     @echo "  \033[32mcheck\033[0m          vet + test + lint"
     @echo ""
-    @echo "\033[1;33m KERNEL\033[0m"
-    @echo "  \033[32mmodules-load\033[0m   load binder_linux (+ ashmem_linux)"
-    @echo "  \033[32mmodules-unload\033[0m unload kernel modules"
-    @echo "  \033[32mmodules-status\033[0m show loaded binder/ashmem modules"
-    @echo ""
     @echo "\033[1;33m IMAGE\033[0m"
     @echo "  \033[32mimage-build\033[0m    podman build -t {{image}}"
     @echo "  \033[32mimage-clean\033[0m    remove the container image"
     @echo ""
-    @echo "\033[1;33m WORKFLOW\033[0m"
-    @echo "  \033[32msetup\033[0m          modules-load + image-build (first-time setup)"
+    @echo "\033[2m kernel modules are managed in-app: run x11droid, press s (Setup) → Load Modules\033[0m"
 
 build:
-    {{go}} build -o {{binary}} ./cmd/x11droid
+    @{{go}} build -ldflags "\
+      -X {{vpkg}}.Version=$(git describe --tags --always --dirty 2>/dev/null || echo dev) \
+      -X {{vpkg}}.Commit=$(git rev-parse --short HEAD 2>/dev/null || echo none) \
+      -X {{vpkg}}.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+      -o {{binary}} ./cmd/x11droid
+    @echo "built {{binary}} — $(./{{binary}} --version)"
 
 run: build
     ./{{binary}}
 
-install: build
-    cp {{binary}} /tmp/{{binary}}_install && mv /tmp/{{binary}}_install ~/.local/bin/{{binary}}
-    @echo "installed to ~/.local/bin/{{binary}}"
+install:
+    sudo install -m 0755 {{binary}} /usr/local/bin/{{binary}}
+    @echo "installed to /usr/local/bin/{{binary}} (run with: sudo {{binary}})"
 
 tidy:
     {{go}} mod tidy
@@ -67,17 +67,3 @@ image-build:
 
 image-clean:
     podman rmi -f {{image}}
-
-modules-load:
-    sudo modprobe binder_linux
-    sudo modprobe ashmem_linux 2>/dev/null || true
-
-modules-unload:
-    sudo rmmod ashmem_linux 2>/dev/null || true
-    sudo rmmod binder_linux 2>/dev/null || true
-
-modules-status:
-    @grep -E "binder|ashmem" /proc/modules || echo "no modules loaded"
-
-setup: modules-load image-build
-    @echo "\033[1;32m✓ ready — run 'just run'\033[0m"

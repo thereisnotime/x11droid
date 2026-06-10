@@ -1,14 +1,25 @@
 package container
 
 import (
+	_ "embed"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/thereisnotime/x11droid/internal/system"
 )
 
-// containerfileContent is the embedded Containerfile. It is written to
-// ~/.config/x11droid/ on demand so the binary is self-contained.
+// entrypointContent is the container entrypoint script, embedded so the
+// app-driven build is self-contained. The repo Containerfile copies the same
+// file directly; this keeps a single source of truth.
+//
+//go:embed entrypoint.sh
+var entrypointContent string
+
+// containerfileContent is the embedded Containerfile written to
+// ~/.config/x11droid/ on demand (alongside entrypoint.sh) so the binary is
+// self-contained.
 const containerfileContent = `FROM ubuntu:24.04
 
 # Only apt-related env here — changing anything above the waydroid layer
@@ -27,6 +38,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         python3-pip \
         wl-clipboard \
+        dbus \
         cage \
         weston && \
     rm -rf /var/lib/apt/lists/*
@@ -39,55 +51,15 @@ ENV WLR_BACKENDS=x11 \
 RUN printf '#!/bin/sh\nexec true\n' > /usr/local/bin/modprobe && \
     chmod +x /usr/local/bin/modprobe
 
-RUN printf '#!/bin/bash\n\
-COMPOSITOR="${WAYDROID_COMPOSITOR:-cage}"\n\
-GAPPS="${WAYDROID_GAPPS:-}"\n\
-\n\
-cleanup() {\n\
-  trap - EXIT INT TERM HUP\n\
-  waydroid session stop 2>/dev/null || true\n\
-  killall waydroid cage weston 2>/dev/null || true\n\
-}\n\
-trap cleanup EXIT INT TERM HUP\n\
-\n\
-# First-run initialisation — downloads Android image (~500MB).\n\
-if [ ! -f /var/lib/waydroid/images/system.img ]; then\n\
-  echo "[x11droid] First run: initialising Waydroid (this downloads ~500MB, please wait)..."\n\
-  if [ -n "$GAPPS" ]; then\n\
-    waydroid init -f -s GAPPS\n\
-  else\n\
-    waydroid init -f\n\
-  fi\n\
-  if [ $? -ne 0 ]; then\n\
-    echo "[x11droid] waydroid init failed — check logs with: x11droid logs <name>"\n\
-    exit 1\n\
-  fi\n\
-  echo "[x11droid] Init done, starting UI..."\n\
-fi\n\
-\n\
-case "$COMPOSITOR" in\n\
-  cage)\n\
-    cage -s -- waydroid show-full-ui\n\
-    ;;\n\
-  weston)\n\
-    weston --xwayland &\n\
-    export WAYLAND_DISPLAY=wayland-0\n\
-    sleep 2\n\
-    waydroid show-full-ui\n\
-    ;;\n\
-  *)\n\
-    echo "Unknown compositor: $COMPOSITOR" >&2\n\
-    exit 1\n\
-    ;;\n\
-esac\n' > /usr/bin/waydroid-session.sh && \
-    chmod +x /usr/bin/waydroid-session.sh
+COPY entrypoint.sh /usr/bin/waydroid-session.sh
+RUN chmod +x /usr/bin/waydroid-session.sh
 
 ENTRYPOINT ["/usr/bin/waydroid-session.sh"]
 `
 
 func configDir() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
+	home := system.ResolveHostUser().Home
+	if home == "" {
 		return "/tmp/x11droid"
 	}
 	return filepath.Join(home, ".config", "x11droid")
@@ -105,16 +77,18 @@ func ensureFakeModprobe(path string) error {
 	return os.WriteFile(path, []byte("#!/bin/sh\nexec true\n"), 0755)
 }
 
-// ensureContainerfile writes the embedded Containerfile to
-// ~/.config/x11droid/Containerfile if it does not already exist.
+// ensureContainerfile writes the embedded Containerfile and entrypoint.sh to
+// ~/.config/x11droid/ so the directory is a self-contained build context.
 func ensureContainerfile() (string, error) {
 	dir := configDir()
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", fmt.Errorf("create config dir: %w", err)
 	}
-	dst := filepath.Join(dir, "Containerfile")
-	if err := os.WriteFile(dst, []byte(containerfileContent), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "Containerfile"), []byte(containerfileContent), 0644); err != nil {
 		return "", fmt.Errorf("write Containerfile: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "entrypoint.sh"), []byte(entrypointContent), 0755); err != nil {
+		return "", fmt.Errorf("write entrypoint.sh: %w", err)
 	}
 	return dir, nil
 }

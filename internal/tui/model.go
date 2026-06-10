@@ -1,14 +1,15 @@
 package tui
 
 import (
-	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/thereisnotime/x11droid/internal/config"
 	"github.com/thereisnotime/x11droid/internal/container"
 	"github.com/thereisnotime/x11droid/internal/kernel"
 	"github.com/thereisnotime/x11droid/internal/system"
@@ -21,8 +22,12 @@ const (
 	viewDetail
 	viewSpawn
 	viewSetup
+	viewConfig
 	viewHelp
 )
+
+// refreshInterval is how often the dashboard re-fetches the instance list.
+const refreshInterval = 3 * time.Second
 
 type errMsg struct{ err error }
 type instancesMsg []container.Instance
@@ -37,6 +42,15 @@ type imageStatusMsg struct {
 	exists bool
 	valid  bool // false when the check itself failed
 }
+type tickMsg struct{}
+
+// bg* messages are silent background refreshes — they update data without
+// touching loading/error/status state, so periodic polling stays unobtrusive.
+type bgInstancesMsg struct {
+	list []container.Instance
+	ok   bool
+}
+type bgLogsMsg string
 
 type Model struct {
 	view      view
@@ -71,6 +85,12 @@ type Model struct {
 	setupCursor     int
 	podmanInstalled bool
 	prereqsChecked  bool
+
+	// config view
+	cfg          config.Config
+	configCursor int
+
+	isRoot bool
 }
 
 func newSpawnInput() textinput.Model {
@@ -89,11 +109,18 @@ func New(sess system.Info) Model {
 		session:         sess,
 		spawnInput:      newSpawnInput(),
 		podmanInstalled: container.PodmanInstalled(),
+		cfg:             config.Load(),
+		isRoot:          system.IsRoot(),
 	}
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(fetchInstances, fetchImageStatus, fetchKernelStatus)
+	return tea.Batch(fetchInstances, fetchImageStatus, fetchKernelStatus, tick)
+}
+
+func tick() tea.Msg {
+	time.Sleep(refreshInterval)
+	return tickMsg{}
 }
 
 func fetchInstances() tea.Msg {
@@ -102,6 +129,21 @@ func fetchInstances() tea.Msg {
 		return errMsg{err}
 	}
 	return instancesMsg(list)
+}
+
+func fetchInstancesBg() tea.Msg {
+	list, err := container.List()
+	return bgInstancesMsg{list: list, ok: err == nil}
+}
+
+func fetchLogsBg(name string) tea.Cmd {
+	return func() tea.Msg {
+		out, err := container.Logs(name)
+		if err != nil {
+			return bgLogsMsg("")
+		}
+		return bgLogsMsg(out)
+	}
 }
 
 func fetchKernelStatus() tea.Msg { return kernelStatusMsg(kernel.Status()) }
@@ -146,6 +188,45 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.imageExists = msg.exists
 		}
 		m.prereqsChecked = true
+		return m, nil
+
+	case tickMsg:
+		// Keep ticking and quietly refresh whatever the current view shows.
+		cmds := []tea.Cmd{tick}
+		switch m.view {
+		case viewMain:
+			if !m.loading {
+				cmds = append(cmds, fetchInstancesBg)
+			}
+		case viewDetail:
+			cmds = append(cmds, fetchInstancesBg) // keep selected status live
+			if m.showLogs {
+				cmds = append(cmds, fetchLogsBg(m.selected.Name))
+			}
+		}
+		return m, tea.Batch(cmds...)
+
+	case bgInstancesMsg:
+		if !msg.ok {
+			return m, nil // ignore transient errors during background polls
+		}
+		m.instances = msg.list
+		if m.cursor >= len(m.instances) && len(m.instances) > 0 {
+			m.cursor = len(m.instances) - 1
+		}
+		// Keep the detail view's selected instance status fresh.
+		for _, inst := range m.instances {
+			if inst.Name == m.selected.Name {
+				m.selected = inst
+				break
+			}
+		}
+		return m, nil
+
+	case bgLogsMsg:
+		if m.view == viewDetail && m.showLogs {
+			m.logs = string(msg)
+		}
 		return m, nil
 
 	case buildDoneMsg:
@@ -222,6 +303,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleSpawn(msg)
 	case viewSetup:
 		return m.handleSetup(msg)
+	case viewConfig:
+		return m.handleConfig(msg)
 	case viewHelp:
 		if key.Matches(msg, keys.Esc) {
 			m.view = m.prevView
@@ -362,6 +445,10 @@ func (m Model) handleMain(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.setupCursor = 0
 		m.view = viewSetup
 		return m, tea.Batch(fetchKernelStatus, fetchImageStatus)
+	case key.Matches(msg, keys.Config):
+		m.cfg = config.Load()
+		m.configCursor = 0
+		m.view = viewConfig
 	case key.Matches(msg, keys.Refresh):
 		m.loading = true
 		return m, fetchInstances
@@ -369,7 +456,94 @@ func (m Model) handleMain(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-var detailActions = []string{"Start", "Stop", "Remove", "Shell", "Logs"}
+// resolutionPresets are the portrait (tall) dimensions offered in the config
+// view; orientation swaps them for landscape.
+var resolutionPresets = [][2]int{
+	{480, 800},
+	{540, 960},
+	{720, 1280},
+	{1080, 1920},
+}
+
+const configFields = 4 // resolution, orientation, compositor, save
+
+var compositorChoices = []string{config.CompositorAuto, config.CompositorWeston, config.CompositorCage}
+
+// cycleResolution moves the current width/height to the next/previous preset.
+func (m *Model) cycleResolution(delta int) {
+	idx := 0
+	for i, p := range resolutionPresets {
+		if p[0] == m.cfg.Width && p[1] == m.cfg.Height {
+			idx = i
+			break
+		}
+	}
+	idx = (idx + delta + len(resolutionPresets)) % len(resolutionPresets)
+	m.cfg.Width = resolutionPresets[idx][0]
+	m.cfg.Height = resolutionPresets[idx][1]
+}
+
+func (m *Model) cycleCompositor(delta int) {
+	idx := 0
+	for i, c := range compositorChoices {
+		if c == m.cfg.Compositor {
+			idx = i
+			break
+		}
+	}
+	idx = (idx + delta + len(compositorChoices)) % len(compositorChoices)
+	m.cfg.Compositor = compositorChoices[idx]
+}
+
+func (m Model) handleConfig(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, keys.Esc):
+		m.view = viewMain
+	case key.Matches(msg, keys.Up):
+		if m.configCursor > 0 {
+			m.configCursor--
+		}
+	case key.Matches(msg, keys.Down), key.Matches(msg, keys.Tab):
+		if m.configCursor < configFields-1 {
+			m.configCursor++
+		} else {
+			m.configCursor = 0
+		}
+	case key.Matches(msg, keys.Space), key.Matches(msg, keys.Right):
+		m.applyConfigChange(1)
+	case key.Matches(msg, keys.Left):
+		m.applyConfigChange(-1)
+	case key.Matches(msg, keys.Enter):
+		if m.configCursor == configFields-1 {
+			if err := m.cfg.Save(); err != nil {
+				m.err = err
+			} else {
+				m.statusMsg = "config saved"
+			}
+		} else {
+			m.applyConfigChange(1)
+		}
+	}
+	return m, nil
+}
+
+// applyConfigChange cycles the value of the focused field.
+func (m *Model) applyConfigChange(delta int) {
+	switch m.configCursor {
+	case 0:
+		m.cycleResolution(delta)
+	case 1:
+		if m.cfg.Orientation == config.Portrait {
+			m.cfg.Orientation = config.Landscape
+		} else {
+			m.cfg.Orientation = config.Portrait
+		}
+	case 2:
+		m.cycleCompositor(delta)
+	}
+}
+
+var detailActions = []string{"Show UI", "Start", "Stop", "Remove", "Purge", "Shell", "Logs"}
 
 func (m Model) handleDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.showLogs {
@@ -396,6 +570,11 @@ func (m Model) handleDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) execDetailAction() (Model, tea.Cmd) {
 	name := m.selected.Name
 	switch detailActions[m.actionCursor] {
+	case "Show UI":
+		m.statusMsg = "Opening GUI..."
+		return m, func() tea.Msg {
+			return actionDoneMsg{container.ShowUI(name)}
+		}
 	case "Start":
 		m.statusMsg = "Starting..."
 		return m, func() tea.Msg {
@@ -412,9 +591,15 @@ func (m Model) execDetailAction() (Model, tea.Cmd) {
 		return m, func() tea.Msg {
 			return actionDoneMsg{container.Remove(name)}
 		}
+	case "Purge":
+		m.statusMsg = "Purging (container + data)..."
+		m.view = viewMain
+		return m, func() tea.Msg {
+			return actionDoneMsg{container.Purge(name)}
+		}
 	case "Shell":
 		return m, tea.ExecProcess(
-			exec.Command("podman", "exec", "-it", name, "bash"),
+			exec.Command("sudo", "podman", "exec", "-it", name, "bash"),
 			func(err error) tea.Msg { return actionDoneMsg{err} },
 		)
 	case "Logs":
@@ -474,11 +659,15 @@ func (m Model) handleSpawn(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.err = &simpleErr{"instance name cannot be empty"}
 				return m, nil
 			}
+			w, h := m.cfg.EffectiveDims()
 			opts := container.SpawnOpts{
-				Name:    name,
-				GApps:   m.spawnGApps,
-				HideARM: m.spawnHideARM,
-				PV:      m.spawnPV,
+				Name:       name,
+				GApps:      m.spawnGApps,
+				HideARM:    m.spawnHideARM,
+				PV:         m.spawnPV,
+				Width:      w,
+				Height:     h,
+				Compositor: m.cfg.Compositor,
 			}
 			m.spawnInput.Blur()
 			m.statusMsg = "Spawning..."
@@ -500,21 +689,6 @@ func (m Model) handleSpawn(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 	return m, nil
-}
-
-// sudoCmd runs a shell command as root via sudo. It opens /dev/tty directly so
-// sudo's password prompt gets a proper TTY regardless of how bubbletea
-// managed the terminal, then pauses so the user can read the output.
-func sudoCmd(shellCmd string) *exec.Cmd {
-	script := "sudo sh -c '" + shellCmd + "'; echo; printf 'press enter to return...'; read _"
-	cmd := exec.Command("sh", "-c", script)
-	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
-	if err == nil {
-		cmd.Stdin = tty
-		cmd.Stdout = tty
-		cmd.Stderr = tty
-	}
-	return cmd
 }
 
 var setupActions = []string{"Load Modules", "Unload Modules", "Build Image", "Refresh"}
@@ -540,15 +714,11 @@ func (m Model) handleSetup(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) execSetupAction() (Model, tea.Cmd) {
 	switch setupActions[m.setupCursor] {
 	case "Load Modules":
-		return m, tea.ExecProcess(
-			sudoCmd("modprobe binder_linux; modprobe ashmem_linux 2>/dev/null || true"),
-			func(err error) tea.Msg { return actionDoneMsg{err} },
-		)
+		m.statusMsg = "Loading modules..."
+		return m, func() tea.Msg { return actionDoneMsg{kernel.Load()} }
 	case "Unload Modules":
-		return m, tea.ExecProcess(
-			sudoCmd("rmmod ashmem_linux 2>/dev/null || true; rmmod binder_linux 2>/dev/null || true"),
-			func(err error) tea.Msg { return actionDoneMsg{err} },
-		)
+		m.statusMsg = "Unloading modules..."
+		return m, func() tea.Msg { return actionDoneMsg{kernel.Unload()} }
 	case "Build Image":
 		cmd, err := container.BuildImageCmd()
 		if err != nil {
@@ -583,6 +753,7 @@ func (m Model) renderHeader() string {
 		viewDetail: "Instance",
 		viewSpawn:  "New Instance",
 		viewSetup:  "Setup",
+		viewConfig: "Config",
 		viewHelp:   "Help",
 	}
 	title := styleTitle.Render("x11droid")
@@ -618,10 +789,11 @@ func (m Model) renderHeader() string {
 
 func (m Model) renderFooter() string {
 	hints := map[view]string{
-		viewMain:   "↑↓ navigate  enter select  n new  s setup  r refresh  ? help  q quit",
+		viewMain:   "↑↓ navigate  enter select  n new  s setup  c config  r refresh  ? help  q quit",
 		viewDetail: "↑↓ navigate  enter action  esc back  ? help  q quit",
 		viewSpawn:  "tab/↑↓ navigate  space toggle  enter confirm  esc back  ? help",
 		viewSetup:  "↑↓ navigate  enter action  esc back  ? help  q quit",
+		viewConfig: "↑↓ navigate  ←→/space change  enter save  esc back  ? help",
 		viewHelp:   "esc/? back  q quit",
 	}
 	return styleFooter.Width(m.width).Render(hints[m.view])
@@ -637,6 +809,8 @@ func (m Model) renderBody() string {
 		return renderSpawn(m)
 	case viewSetup:
 		return renderSetup(m)
+	case viewConfig:
+		return renderConfig(m)
 	case viewHelp:
 		return renderHelp(m)
 	}
@@ -645,6 +819,9 @@ func (m Model) renderBody() string {
 
 // prereqWarning returns a non-empty string when required setup is incomplete.
 func (m Model) prereqWarning() string {
+	if !m.isRoot {
+		return "not running as root — quit and restart with: sudo x11droid"
+	}
 	if !m.prereqsChecked {
 		return ""
 	}

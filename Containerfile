@@ -1,44 +1,35 @@
 FROM ubuntu:24.04
 
+# Only apt-related env here — changing anything above the waydroid layer
+# busts its cache and triggers a multi-GB re-download.
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Layer 1 — waydroid (slow, changes rarely — must stay cached)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl ca-certificates && \
+    curl https://repo.waydro.id | bash && \
+    apt-get install -y --no-install-recommends waydroid && \
+    rm -rf /var/lib/apt/lists/*
+
+# Layer 2 — display stack (faster, safe to modify without busting waydroid cache)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        curl \
-        ca-certificates \
         python3-pip \
         wl-clipboard \
+        dbus \
         cage \
         weston && \
     rm -rf /var/lib/apt/lists/*
 
-RUN curl https://repo.waydro.id | bash && \
-    apt-get install -y --no-install-recommends waydroid && \
-    rm -rf /var/lib/apt/lists/*
+# Runtime env — after all slow layers so changing these doesn't bust cache
+ENV WLR_BACKENDS=x11 \
+    WLR_RENDERER=pixman \
+    XDG_SESSION_TYPE=x11
 
-RUN printf '#!/bin/bash\n\
-COMPOSITOR="${WAYDROID_COMPOSITOR:-cage}"\n\
-cleanup() {\n\
-  trap - EXIT INT TERM HUP\n\
-  waydroid session stop 2>/dev/null || true\n\
-  killall waydroid cage weston 2>/dev/null || true\n\
-}\n\
-trap cleanup EXIT INT TERM HUP\n\
-case "$COMPOSITOR" in\n\
-  cage)\n\
-    cage -s -- waydroid show-full-ui\n\
-    ;;\n\
-  weston)\n\
-    weston --xwayland &\n\
-    export WAYLAND_DISPLAY=wayland-0\n\
-    sleep 2\n\
-    waydroid show-full-ui\n\
-    ;;\n\
-  *)\n\
-    echo "Unknown compositor: $COMPOSITOR" >&2\n\
-    exit 1\n\
-    ;;\n\
-esac\n' > /usr/bin/waydroid-session.sh && \
-    chmod +x /usr/bin/waydroid-session.sh
+RUN printf '#!/bin/sh\nexec true\n' > /usr/local/bin/modprobe && \
+    chmod +x /usr/local/bin/modprobe
+
+COPY internal/container/entrypoint.sh /usr/bin/waydroid-session.sh
+RUN chmod +x /usr/bin/waydroid-session.sh
 
 ENTRYPOINT ["/usr/bin/waydroid-session.sh"]
