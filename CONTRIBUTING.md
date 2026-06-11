@@ -20,6 +20,10 @@ just tidy       # go mod tidy
 
 Only fall back to raw `go`/`podman` when no `just` recipe covers what you need.
 
+## Specs (OpenSpec)
+
+This repo uses [OpenSpec](https://github.com/Fission-AI/OpenSpec) for spec-driven development — specs live in `openspec/specs/`, change proposals in `openspec/changes/`. For a non-trivial feature or behavior change, **create a change proposal first** (`openspec` CLI, or the OpenSpec Claude skills / `/opsx:propose`), get it reviewed, implement against it, then archive (`openspec archive`). Run `openspec list` / `openspec view` to see current specs and changes. Small fixes and docs don't need a proposal.
+
 ## Pull requests
 
 - Keep changes focused and match the surrounding code style.
