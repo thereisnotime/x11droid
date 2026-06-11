@@ -15,7 +15,7 @@ Go CLI/TUI for running and managing [Waydroid](https://waydro.id) (Android) inst
 Use the `just` recipes for all build/test/run/setup tasks. Only fall back to raw `go`/`podman` commands when no recipe covers what you need.
 
 - `just build` / `just run` / `just install` / `just clean`
-- `just check` (vet + test + lint), or `just test` / `just vet` / `just lint` individually
+- `just check` (vet + test + lint + yamllint + actionlint), or run each individually (`just test` / `just vet` / `just lint` / `just yamllint` / `just actionlint`)
 - `just tidy` — go mod tidy
 - `just image-build` / `just image-clean`
 - `just adb <name>` / `just apk <name> <path>` / `just logcat <name>` — debug helpers (also CLI: `x11droid adb`/`install`/`logcat`)

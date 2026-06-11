@@ -29,7 +29,7 @@ Run `just` (or `just --list`) for the live list. As of now:
 | QUALITY | `just test` / `just test-v` | `go test ./...` (verbose variant) |
 | QUALITY | `just lint` | `golangci-lint run ./...` |
 | QUALITY | `just vet` | `go vet ./...` |
-| QUALITY | `just check` | vet + test + lint (run before every push) |
+| QUALITY | `just check` | vet + test + lint + yamllint + actionlint (run before every push) |
 | IMAGE | `just image-build` | `podman build -t x11droid:latest .` |
 | IMAGE | `just image-clean` | remove the container image |
 | DEBUG | `just adb <name>` | interactive Android root shell (`waydroid shell`) |
