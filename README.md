@@ -1,9 +1,34 @@
 # x11droid
 
-![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)
-![Platform](https://img.shields.io/badge/platform-Linux-FCC624?logo=linux&logoColor=black)
-![Podman](https://img.shields.io/badge/Podman-required-892CA0?logo=podman&logoColor=white)
-![TUI](https://img.shields.io/badge/TUI-Bubble%20Tea-FF69B4?logo=charm&logoColor=white)
+<table>
+  <tr>
+    <th>CI</th>
+    <th>Code</th>
+    <th>Security</th>
+    <th>Stack</th>
+  </tr>
+  <tr>
+    <td>
+      <a href="https://github.com/thereisnotime/x11droid/actions/workflows/ci.yml"><img src="https://github.com/thereisnotime/x11droid/actions/workflows/ci.yml/badge.svg" alt="CI"></a><br>
+      <a href="https://github.com/thereisnotime/x11droid/actions/workflows/codeql.yml"><img src="https://github.com/thereisnotime/x11droid/actions/workflows/codeql.yml/badge.svg" alt="CodeQL"></a>
+    </td>
+    <td>
+      <a href="https://goreportcard.com/report/github.com/thereisnotime/x11droid"><img src="https://goreportcard.com/badge/github.com/thereisnotime/x11droid" alt="Go Report Card"></a><br>
+      <a href="go.mod"><img src="https://img.shields.io/github/go-mod/go-version/thereisnotime/x11droid" alt="Go Version"></a><br>
+      <a href="https://github.com/thereisnotime/x11droid/commits/master"><img src="https://img.shields.io/github/last-commit/thereisnotime/x11droid" alt="Last commit"></a>
+    </td>
+    <td>
+      <a href="https://github.com/thereisnotime/x11droid/actions/workflows/scorecard.yml"><img src="https://github.com/thereisnotime/x11droid/actions/workflows/scorecard.yml/badge.svg" alt="Scorecard"></a><br>
+      <a href="https://securityscorecards.dev/viewer/?uri=github.com/thereisnotime/x11droid"><img src="https://api.securityscorecards.dev/projects/github.com/thereisnotime/x11droid/badge" alt="OpenSSF Scorecard"></a><br>
+      <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="License: GPL v3"></a>
+    </td>
+    <td>
+      <img src="https://img.shields.io/badge/platform-Linux-FCC624?logo=linux&logoColor=black" alt="Linux"><br>
+      <img src="https://img.shields.io/badge/Podman-rootful-892CA0?logo=podman&logoColor=white" alt="Podman"><br>
+      <img src="https://img.shields.io/badge/TUI-Bubble%20Tea-FF69B4?logo=charm&logoColor=white" alt="Bubble Tea">
+    </td>
+  </tr>
+</table>
 
 **Don't like Wayland? Want to run Waydroid/Android in X11 as a container instead of a VM? This is what x11droid does.**
 
@@ -182,6 +207,35 @@ x11droid  /  Dashboard
 
 Instance actions include **Show UI** ((re)open the Android window — it relaunches the compositor if it died, so a black/closed window recovers without a respawn), **Hide UI** (unmaps the X11 window — Android and the compositor keep running, so Show UI re-maps it instantly with no reboot), **Purge** (remove + delete the instance's Android data), and the usual Start/Stop/Remove/Shell/Logs (logs are live).
 
+## CLI
+
+The bare command opens the TUI; every action is also a scriptable subcommand (all run under `sudo`):
+
+```bash
+sudo x11droid spawn pixel --gapps --hidearm --root --dev-options   # create + start
+sudo x11droid list                  # all instances + status
+sudo x11droid attach pixel          # (re)open the GUI window
+sudo x11droid hide pixel            # hide the window (Android keeps running)
+sudo x11droid stop pixel            # start · stop · rm [--purge]
+sudo x11droid shell pixel           # bash inside the container
+sudo x11droid logs pixel            # container + entrypoint logs
+sudo x11droid prune --all           # reclaim orphan data
+sudo x11droid setup build           # build the image (also: load / unload / status)
+sudo x11droid config --width 720 --height 1280
+```
+
+| Command | Description |
+|---------|-------------|
+| `list` (`ls`, `ps`) | List instances with status |
+| `spawn <name> [flags]` | Create and start an instance (`--gapps --hidearm --root --dev-options --fdroid --aurora --obtainium --shelter --device-name --no-pv`) |
+| `attach [name]` / `hide <name>` | (Re)open / hide the GUI window |
+| `start` / `stop` / `rm [--purge]` | Lifecycle (`rm --purge` also deletes the instance's data) |
+| `shell` / `logs` | Shell into / view the container logs |
+| `prune [--all]` | Show disk usage and reclaim orphan data |
+| `config` / `setup` / `version` | Defaults / image+modules / version |
+
+Full reference (flags, internals, debug helpers): **[docs/ADVANCED.md](docs/ADVANCED.md)**.
+
 ## Just recipes
 
 ```
@@ -231,3 +285,13 @@ sudo podman rmi -f x11droid:latest
 - [ ] **Fix config-folder ownership** — running under `sudo` leaves `~/.config/x11droid/` (instances, images, data) owned by `root`, so the invoking user can't manage or delete them without `sudo`. `chown` the tree back to `SUDO_USER` so it stays user-owned.
 - [ ] **Auto-grant permissions for installed apps** — after installing the optional apps (F-Droid, Aurora, Obtainium, Shelter, Magisk), grant the runtime permissions and special access they need (install-unknown-apps, storage, etc.) via `pm grant` / `appops` / `cmd` so they work out of the box without manual tapping through dialogs.
 - [x] Screenshot/GIF in the README.
+
+## Contributing
+
+Issues and PRs welcome — see **[CONTRIBUTING.md](CONTRIBUTING.md)**. `just check` (vet + test + lint) must pass; CI runs the same. Found a bug? Use the [bug report form](https://github.com/thereisnotime/x11droid/issues/new?template=bug_report.yml) — it collects the host/log info needed to debug.
+
+<a href="https://github.com/thereisnotime/x11droid/graphs/contributors"><img src="https://contrib.rocks/image?repo=thereisnotime/x11droid" alt="Contributors"></a>
+
+## License
+
+[GPL-3.0](LICENSE) © x11droid contributors.
