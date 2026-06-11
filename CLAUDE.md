@@ -22,6 +22,10 @@ Use the `just` recipes for all build/test/run/setup tasks. Only fall back to raw
 
 Kernel modules and image build are managed in-app (Setup screen) or via `x11droid setup load|unload|build` — not through `just`.
 
+## OpenSpec
+
+This repo uses [OpenSpec](https://github.com/Fission-AI/OpenSpec) for spec-driven development — specs live in `openspec/specs/`, change proposals in `openspec/changes/`. For non-trivial features/changes, create a change proposal first (`openspec` CLI or the `openspec-propose` skill), then implement, then archive. Run `openspec list` / `openspec view` to see current specs and changes.
+
 Go is pinned via asdf (`.tool-versions`); recipes call `asdf exec go` / `asdf exec golangci-lint`.
 
 ## Git, commits & versioning

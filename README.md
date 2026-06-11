@@ -6,6 +6,7 @@
     <th>Code</th>
     <th>Security</th>
     <th>Stack</th>
+    <th>Spec</th>
   </tr>
   <tr>
     <td>
@@ -33,6 +34,9 @@
       <img src="https://img.shields.io/badge/platform-Linux-FCC624?logo=linux&logoColor=black" alt="Linux"><br>
       <img src="https://img.shields.io/badge/Podman-rootful-892CA0?logo=podman&logoColor=white" alt="Podman"><br>
       <img src="https://img.shields.io/badge/TUI-Bubble%20Tea-FF69B4?logo=charm&logoColor=white" alt="Bubble Tea">
+    </td>
+    <td>
+      <a href="openspec/"><img src="https://img.shields.io/badge/OpenSpec-spec--driven-8A2BE2" alt="OpenSpec"></a>
     </td>
   </tr>
 </table>
