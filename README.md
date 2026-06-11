@@ -11,16 +11,19 @@
   <tr>
     <td>
       <a href="https://github.com/thereisnotime/x11droid/actions/workflows/ci.yml"><img src="https://github.com/thereisnotime/x11droid/actions/workflows/ci.yml/badge.svg" alt="CI"></a><br>
-      <a href="https://github.com/thereisnotime/x11droid/actions/workflows/codeql.yml"><img src="https://github.com/thereisnotime/x11droid/actions/workflows/codeql.yml/badge.svg" alt="CodeQL"></a>
+      <a href="https://github.com/thereisnotime/x11droid/actions/workflows/codeql.yml"><img src="https://github.com/thereisnotime/x11droid/actions/workflows/codeql.yml/badge.svg" alt="CodeQL"></a><br>
+      <a href="https://github.com/thereisnotime/x11droid/actions/workflows/release.yml"><img src="https://github.com/thereisnotime/x11droid/actions/workflows/release.yml/badge.svg" alt="Release"></a>
     </td>
     <td>
       <a href="https://goreportcard.com/report/github.com/thereisnotime/x11droid"><img src="https://goreportcard.com/badge/github.com/thereisnotime/x11droid" alt="Go Report Card"></a><br>
       <a href="https://codecov.io/gh/thereisnotime/x11droid"><img src="https://codecov.io/gh/thereisnotime/x11droid/graph/badge.svg" alt="codecov"></a><br>
       <a href="https://pkg.go.dev/github.com/thereisnotime/x11droid"><img src="https://pkg.go.dev/badge/github.com/thereisnotime/x11droid.svg" alt="Go Reference"></a><br>
       <a href="go.mod"><img src="https://img.shields.io/github/go-mod/go-version/thereisnotime/x11droid" alt="Go Version"></a><br>
+      <a href="https://github.com/thereisnotime/x11droid/releases/latest"><img src="https://img.shields.io/github/v/release/thereisnotime/x11droid" alt="Latest Release"></a><br>
       <a href="https://github.com/thereisnotime/x11droid/commits/master"><img src="https://img.shields.io/github/last-commit/thereisnotime/x11droid" alt="Last commit"></a>
     </td>
     <td>
+      <a href="https://github.com/thereisnotime/x11droid/actions/workflows/security.yml"><img src="https://github.com/thereisnotime/x11droid/actions/workflows/security.yml/badge.svg" alt="Security"></a><br>
       <a href="https://github.com/thereisnotime/x11droid/actions/workflows/scorecard.yml"><img src="https://github.com/thereisnotime/x11droid/actions/workflows/scorecard.yml/badge.svg" alt="Scorecard"></a><br>
       <a href="https://securityscorecards.dev/viewer/?uri=github.com/thereisnotime/x11droid"><img src="https://api.securityscorecards.dev/projects/github.com/thereisnotime/x11droid/badge" alt="OpenSSF Scorecard"></a><br>
       <a href="https://www.bestpractices.dev/en/projects?q=x11droid"><img src="https://img.shields.io/badge/OpenSSF_Best_Practices-register-blue" alt="OpenSSF Best Practices"></a><br>
@@ -36,7 +39,10 @@
       <img src="https://img.shields.io/badge/TUI-Bubble%20Tea-FF69B4?logo=charm&logoColor=white" alt="Bubble Tea">
     </td>
     <td>
-      <a href="openspec/"><img src="https://img.shields.io/badge/OpenSpec-spec--driven-8A2BE2" alt="OpenSpec"></a>
+      <a href="openspec/specs/"><img src="https://raw.githubusercontent.com/thereisnotime/x11droid/gh-pages/badges/number_of_specs.svg" alt="Specs"></a><br>
+      <a href="openspec/specs/"><img src="https://raw.githubusercontent.com/thereisnotime/x11droid/gh-pages/badges/number_of_requirements.svg" alt="Requirements"></a><br>
+      <a href="openspec/changes/"><img src="https://raw.githubusercontent.com/thereisnotime/x11droid/gh-pages/badges/tasks_status.svg" alt="Tasks"></a><br>
+      <a href="openspec/changes/"><img src="https://raw.githubusercontent.com/thereisnotime/x11droid/gh-pages/badges/open_changes.svg" alt="Open Changes"></a>
     </td>
   </tr>
 </table>
@@ -301,8 +307,8 @@ sudo podman rmi -f x11droid:latest
 - [ ] **Device spoofing presets** — one-click `Build.*` profiles (e.g. a real Pixel) for app compatibility.
 - [ ] **Fix config-folder ownership** — running under `sudo` leaves `~/.config/x11droid/` (instances, images, data) owned by `root`, so the invoking user can't manage or delete them without `sudo`. `chown` the tree back to `SUDO_USER` so it stays user-owned.
 - [ ] **Auto-grant permissions for installed apps** — after installing the optional apps (F-Droid, Aurora, Obtainium, Shelter, Magisk), grant the runtime permissions and special access they need (install-unknown-apps, storage, etc.) via `pm grant` / `appops` / `cmd` so they work out of the box without manual tapping through dialogs.
-- [ ] **Release pipeline** — goreleaser to build and publish binaries (with checksums/SBOM) on git tags; wire the Release-workflow and Latest-Release badges and enable versioned downloads.
-- [ ] **CI/CD** — CI (build · test · lint · CodeQL · Scorecard · coverage) is in place; finish CD: automated tagged releases, signing/provenance, and optional container-image publishing.
+- [x] **Release pipeline** — goreleaser builds Linux amd64/arm64 binaries (+ checksums, syft SBOM, cosign signature, SLSA provenance); release-please drives SemVer + CHANGELOG from conventional commits.
+- [x] **CI/CD** — CI (build · test · lint · CodeQL · Scorecard · security suite · coverage) plus CD (release-please → goreleaser with signing/provenance). Optional container-image publishing intentionally skipped (the image is built locally, not distributed).
 - [ ] **Refactor for testability** — extract the parsing/decision logic out of the podman/waydroid exec wrappers (`container`, `tui`) into pure functions so more of the codebase is unit-testable, raising real coverage beyond the I/O glue.
 - [x] Screenshot/GIF in the README.
 

@@ -32,9 +32,18 @@ This repo uses [OpenSpec](https://github.com/Fission-AI/OpenSpec) for spec-drive
 
 ## Commits & versioning
 
-- **[Conventional Commits](https://www.conventionalcommits.org/) are mandatory.** Format: `type(scope): summary` — types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`. Add a scope when it helps (`fix(tui): …`, `feat(container): …`). Breaking changes use `!` (`feat!: …`) or a `BREAKING CHANGE:` footer.
+- **[Conventional Commits](https://www.conventionalcommits.org/) are mandatory** — enforced on PRs by `commitlint` (and locally by the pre-commit `commit-msg` hook). Format: `type(scope): summary` — types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`. Add a scope when it helps (`fix(tui): …`, `feat(container): …`). Breaking changes use `!` (`feat!: …`) or a `BREAKING CHANGE:` footer.
 - Keep the summary natural and human — conventional *format*, not robotic wording. No `Co-Authored-By` trailers.
-- **[Semantic Versioning](https://semver.org/) is mandatory** for releases/tags (`vMAJOR.MINOR.PATCH`): breaking → major, `feat` → minor, `fix`/`perf` → patch.
+- **SemVer + releases are automated** via [release-please](https://github.com/googleapis/release-please): it reads your conventional commits, opens a release PR that bumps the version and updates `CHANGELOG.md`, and on merge tags the release and runs goreleaser (signed binaries + SBOM + provenance). So: write good commit messages, don't hand-edit `CHANGELOG.md` or tag manually.
+
+## Pre-commit hooks
+
+Install the hooks once (runs gofmt/golangci-lint/yamllint/actionlint/gitleaks on staged files and validates your commit message):
+
+```bash
+asdf exec pre-commit install
+asdf exec pre-commit install --hook-type commit-msg
+```
 
 ## Reporting bugs
 
