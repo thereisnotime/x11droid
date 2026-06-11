@@ -26,6 +26,9 @@ jobs:
         with:
           results_file: results.sarif
           results_format: sarif
+          # PAT (repo secret) — improves the Branch-Protection check and avoids
+          # rate limits. Falls back to GITHUB_TOKEN if the secret is unset.
+          repo_token: ${{ secrets.SCORECARD_TOKEN || github.token }}
           publish_results: true
 
       - name: Upload artifact
