@@ -17,9 +17,10 @@ Use the `just` recipes for all build/test/run/setup tasks. Only fall back to raw
 - `just build` / `just run` / `just install` / `just clean`
 - `just check` (vet + test + lint), or `just test` / `just vet` / `just lint` individually
 - `just tidy` — go mod tidy
-- `just modules-load` / `just modules-unload` / `just modules-status`
 - `just image-build` / `just image-clean`
-- `just setup` — modules-load + image-build (first-time)
+- `just adb <name>` / `just apk <name> <path>` / `just logcat <name>` — debug helpers (also CLI: `x11droid adb`/`install`/`logcat`)
+
+Kernel modules and image build are managed in-app (Setup screen) or via `x11droid setup load|unload|build` — not through `just`.
 
 Go is pinned via asdf (`.tool-versions`); recipes call `asdf exec go` / `asdf exec golangci-lint`.
 

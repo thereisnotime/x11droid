@@ -185,7 +185,7 @@ x11droid  /  Dashboard
 | View | How to open | Description |
 |------|-------------|-------------|
 | Dashboard | default | All instances with status (auto-refreshes) |
-| Instance | `enter` | Show UI / Hide UI / Start / Stop / Remove / Purge / Shell / Logs |
+| Instance | `enter` | Show UI / Hide UI / Start / Stop / Remove / Purge / Shell / Android Shell / Logs / Logcat |
 | New Instance | `n` | Name + GApps / ARM / F-Droid / Aurora / Obtainium / Shelter / Dev Options / Root / Persist toggles |
 | Config | `c` | Resolution, orientation, compositor (saved) |
 | Setup | `s` | Module status, image build, sudo modules |
@@ -217,6 +217,9 @@ sudo x11droid list                  # all instances + status
 sudo x11droid attach pixel          # (re)open the GUI window
 sudo x11droid hide pixel            # hide the window (Android keeps running)
 sudo x11droid stop pixel            # start · stop · rm [--purge]
+sudo x11droid adb pixel             # Android root shell (pm / settings / su / magisk)
+sudo x11droid install pixel app.apk # install a local .apk into Android
+sudo x11droid logcat pixel          # stream Android logcat (-d to dump once)
 sudo x11droid shell pixel           # bash inside the container
 sudo x11droid logs pixel            # container + entrypoint logs
 sudo x11droid prune --all           # reclaim orphan data
@@ -230,7 +233,10 @@ sudo x11droid config --width 720 --height 1280
 | `spawn <name> [flags]` | Create and start an instance (`--gapps --hidearm --root --dev-options --fdroid --aurora --obtainium --shelter --device-name --no-pv`) |
 | `attach [name]` / `hide <name>` | (Re)open / hide the GUI window |
 | `start` / `stop` / `rm [--purge]` | Lifecycle (`rm --purge` also deletes the instance's data) |
-| `shell` / `logs` | Shell into / view the container logs |
+| `adb <name>` (`android-shell`) | Interactive Android root shell (`pm` / `settings` / `su` / `magisk`) |
+| `install <name> <apk>` (`apk`) | Install a local `.apk` into Android |
+| `logcat <name> [-d]` | Stream Android logcat (`-d` dumps once) |
+| `shell` / `logs` | Container bash / view the container logs |
 | `prune [--all]` | Show disk usage and reclaim orphan data |
 | `config` / `setup` / `version` | Defaults / image+modules / version |
 

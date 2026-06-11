@@ -285,19 +285,75 @@ func cmdLogs() *cobra.Command {
 	}
 }
 
+// runInteractive wires the command to the terminal and runs it.
+func runInteractive(c *exec.Cmd) error {
+	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
+	return c.Run()
+}
+
 func cmdShell() *cobra.Command {
 	return &cobra.Command{
 		Use:   "shell <name>",
-		Short: "Open a bash shell inside an instance",
+		Short: "Open a bash shell inside an instance's container",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c := exec.Command("podman", "exec", "-it", args[0], "bash")
-			c.Stdin = os.Stdin
-			c.Stdout = os.Stdout
-			c.Stderr = os.Stderr
-			return c.Run()
+			c, err := container.ShellCmd(args[0])
+			if err != nil {
+				return err
+			}
+			return runInteractive(c)
 		},
 	}
+}
+
+func cmdAndroidShell() *cobra.Command {
+	return &cobra.Command{
+		Use:     "adb <name>",
+		Aliases: []string{"android-shell", "ashell"},
+		Short:   "Open an interactive Android root shell (pm / settings / su / magisk live here)",
+		Args:    cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := container.AndroidShellCmd(args[0])
+			if err != nil {
+				return err
+			}
+			return runInteractive(c)
+		},
+	}
+}
+
+func cmdInstall() *cobra.Command {
+	return &cobra.Command{
+		Use:     "install <name> <file.apk>",
+		Aliases: []string{"apk"},
+		Short:   "Install a local .apk into an instance (the `adb install` equivalent)",
+		Args:    cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := container.InstallAPK(args[0], args[1]); err != nil {
+				return err
+			}
+			fmt.Printf("installed %s into %s\n", args[1], args[0])
+			return nil
+		},
+	}
+}
+
+func cmdLogcat() *cobra.Command {
+	var dump bool
+	c := &cobra.Command{
+		Use:   "logcat <name>",
+		Short: "Stream Android logcat from an instance (-d for a one-shot dump)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cc, err := container.LogcatCmd(args[0], dump)
+			if err != nil {
+				return err
+			}
+			return runInteractive(cc)
+		},
+	}
+	c.Flags().BoolVarP(&dump, "dump", "d", false, "dump the current log and exit instead of following")
+	return c
 }
 
 func cmdSetup() *cobra.Command {

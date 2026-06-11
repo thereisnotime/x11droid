@@ -129,6 +129,7 @@ type Model struct {
 	imageExists     bool
 	setupCursor     int
 	podmanInstalled bool
+	podmanRunnable  bool // podman is on PATH AND actually executes
 	prereqsChecked  bool
 
 	// config view
@@ -164,6 +165,7 @@ func New(sess system.Info) Model {
 		spawnInput:      newSpawnInput(),
 		spawnDevice:     newDeviceInput(),
 		podmanInstalled: container.PodmanInstalled(),
+		podmanRunnable:  true, // assume OK until the first image check proves otherwise
 		cfg:             config.Load(),
 		isRoot:          system.IsRoot(),
 	}
@@ -250,6 +252,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.valid {
 			m.imageExists = msg.exists
 		}
+		// valid is false when the `podman images` call itself failed — i.e.
+		// podman is present but can't run (broken install, not root, …).
+		m.podmanRunnable = msg.valid
 		m.prereqsChecked = true
 		return m, nil
 
@@ -637,7 +642,7 @@ func (m *Model) applyConfigChange(delta int) {
 	}
 }
 
-var detailActions = []string{"Show UI", "Hide UI", "Start", "Stop", "Remove", "Purge", "Shell", "Logs"}
+var detailActions = []string{"Show UI", "Hide UI", "Start", "Stop", "Remove", "Purge", "Shell", "Android Shell", "Logs", "Logcat"}
 
 func (m Model) handleDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.showLogs {
@@ -690,10 +695,11 @@ func (m Model) execDetailAction() (Model, tea.Cmd) {
 		m.confirmName = name
 		return m, nil
 	case "Shell":
-		return m, tea.ExecProcess(
-			exec.Command("sudo", "podman", "exec", "-it", name, "bash"),
-			func(err error) tea.Msg { return actionDoneMsg{err} },
-		)
+		return m.runExec(container.ShellCmd(name))
+	case "Android Shell":
+		return m.runExec(container.AndroidShellCmd(name))
+	case "Logcat":
+		return m.runExec(container.LogcatCmd(name, false))
 	case "Logs":
 		return m, func() tea.Msg {
 			logs, err := container.Logs(name)
@@ -704,6 +710,17 @@ func (m Model) execDetailAction() (Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+// runExec suspends the TUI to run an interactive command (shell / Android shell /
+// logcat); if building the command failed a precheck (podman missing, instance
+// not running), it surfaces the error instead.
+func (m Model) runExec(c *exec.Cmd, err error) (Model, tea.Cmd) {
+	if err != nil {
+		m.err = err
+		return m, nil
+	}
+	return m, tea.ExecProcess(c, func(e error) tea.Msg { return actionDoneMsg{e} })
 }
 
 // runConfirmed executes the destructive action the user confirmed.
@@ -1015,16 +1032,19 @@ func (m Model) prereqWarning() string {
 		return ""
 	}
 	var issues []string
-	if !m.podmanInstalled {
-		issues = append(issues, "podman not found")
+	// podman first: if it's missing or can't run, the image check below is moot.
+	switch {
+	case !m.podmanInstalled:
+		issues = append(issues, "podman not found — install it")
+	case !m.podmanRunnable:
+		issues = append(issues, "podman not responding — can't run it (are you root? try: sudo x11droid)")
+	case !m.imageExists:
+		issues = append(issues, "image not built")
 	}
 	for _, s := range m.kernelStatus {
 		if s.Required && !s.OK() {
 			issues = append(issues, s.Name+" not loaded")
 		}
-	}
-	if !m.imageExists {
-		issues = append(issues, "image not built")
 	}
 	if len(issues) == 0 {
 		return ""

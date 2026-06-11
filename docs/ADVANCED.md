@@ -18,6 +18,9 @@ The bare command opens the TUI. Subcommands are scriptable:
 | `prune [--all]` | Show per-instance disk usage and delete orphan data (no container); `--all` removes everything |
 | `logs <name>` | Show the container/entrypoint logs |
 | `shell <name>` | Open a bash shell inside the container |
+| `adb <name>` (`android-shell`) | Interactive Android root shell (`waydroid shell` — `pm`/`settings`/`su`/`magisk`) |
+| `install <name> <apk>` (`apk`) | Install a local `.apk` into Android (`adb install` equivalent) |
+| `logcat <name> [-d]` | Stream Android logcat (`-d` dumps the current log and exits) |
 | `config [--width --height --orientation --compositor]` | Show or set instance defaults |
 | `setup [status\|load\|unload\|build]` | Module status, (un)load `binder_linux`, build the image |
 | `version` | Version, commit, build date |
@@ -84,19 +87,21 @@ The **Dev Options** toggle (or `--dev-options`) flips `development_settings_enab
 
 ## Debug & dev helpers
 
-These `just` recipes act on a running instance (they `sudo podman exec` into it):
+The Android shell, APK install, and logcat are first-class **CLI commands** (and TUI actions — **Android Shell** / **Logcat** in the instance view). They run `waydroid` *inside* the container via `podman exec` — no host `adb` is involved — and error out cleanly if podman is missing or the instance isn't running.
+
+```bash
+sudo x11droid adb pixel9              # Android root shell (magisk -v, su -c id, settings put ...)
+sudo x11droid install pixel9 app.apk  # install a local .apk
+sudo x11droid logcat pixel9           # stream logcat (add -d to dump once and exit)
+```
+
+Equivalent `just` recipes still exist for quick use during development:
 
 | Recipe | Does |
 |--------|------|
-| `just adb <name>` | Interactive Android **root shell** (`waydroid shell`) — e.g. `magisk -v`, `su -c id` |
-| `just apk <name> <path>` | Install a local `.apk` into the instance (`waydroid app install`) — the `adb install` equivalent |
+| `just adb <name>` | Interactive Android **root shell** (`waydroid shell`) |
+| `just apk <name> <path>` | Install a local `.apk` (`waydroid app install`) |
 | `just logcat <name>` | Capture ~25s of Android **logcat** to `/tmp/lc.txt` |
-
-```bash
-just adb pixel9
-just apk pixel9 ~/Downloads/app.apk
-just logcat pixel9
-```
 
 `just adb` opens a shell, not the full `adb` binary. For the real `adb` toolchain (push/pull, `adb logcat -f`, Android Studio), enable adb-over-TCP inside Android and `adb connect` to the instance's `waydroid0` bridge IP.
 

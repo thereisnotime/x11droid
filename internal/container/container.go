@@ -567,6 +567,82 @@ func (i Instance) IsRunning() bool {
 	return strings.HasPrefix(i.Status, "Up")
 }
 
+// IsUp reports whether the named container is currently running.
+func IsUp(name string) bool {
+	out, err := podmanCmd("inspect", "-f", "{{.State.Running}}", name).Output()
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(string(out)) == "true"
+}
+
+// ensureRunnable returns a clear error when an exec-into-instance command can't
+// run: the host has no podman, or the instance container isn't up. These
+// commands run waydroid *inside* the container via podman exec — they do not use
+// a host `adb`, so podman is the only host tool they need.
+func ensureRunnable(name string) error {
+	if !PodmanInstalled() {
+		return fmt.Errorf("podman not found on host — install it (instance commands run via `podman exec`, not host adb)")
+	}
+	if !IsUp(name) {
+		return fmt.Errorf("instance %q is not running — start it (or open Show UI) first", name)
+	}
+	return nil
+}
+
+// ShellCmd returns an interactive bash shell inside the container (the Ubuntu
+// host around waydroid). Caller wires up stdio / runs via tea.ExecProcess.
+func ShellCmd(name string) (*exec.Cmd, error) {
+	if err := ensureRunnable(name); err != nil {
+		return nil, err
+	}
+	return podmanCmd("exec", "-it", name, "bash"), nil
+}
+
+// AndroidShellCmd returns an interactive Android root shell (`waydroid shell`) —
+// where pm / settings / su / magisk / logcat live, distinct from ShellCmd's
+// container bash.
+func AndroidShellCmd(name string) (*exec.Cmd, error) {
+	if err := ensureRunnable(name); err != nil {
+		return nil, err
+	}
+	return podmanCmd("exec", "-it", name, "bash", "-lc", "waydroid shell"), nil
+}
+
+// LogcatCmd streams Android logcat from the instance; dump=true does a one-shot
+// `-d` dump and exits instead of following.
+func LogcatCmd(name string, dump bool) (*exec.Cmd, error) {
+	if err := ensureRunnable(name); err != nil {
+		return nil, err
+	}
+	lc := "waydroid logcat"
+	if dump {
+		lc = "waydroid logcat -d"
+	}
+	return podmanCmd("exec", "-it", name, "bash", "-lc",
+		"export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/dbus/session_bus_socket; "+lc), nil
+}
+
+// InstallAPK copies a local .apk into the instance and installs it into Android
+// (the `adb install` equivalent, via `waydroid app install`).
+func InstallAPK(name, apkPath string) error {
+	if err := ensureRunnable(name); err != nil {
+		return err
+	}
+	if fi, err := os.Stat(apkPath); err != nil || fi.IsDir() {
+		return fmt.Errorf("apk not found: %s", apkPath)
+	}
+	const dst = "/tmp/x11droid-install.apk"
+	if out, err := podmanCmd("cp", apkPath, name+":"+dst).CombinedOutput(); err != nil {
+		return fmt.Errorf("copy apk into %s: %w\n%s", name, err, out)
+	}
+	script := "export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/dbus/session_bus_socket; waydroid app install " + dst
+	if out, err := podmanCmd("exec", name, "bash", "-lc", script).CombinedOutput(); err != nil {
+		return fmt.Errorf("install apk in %s: %w\n%s", name, err, out)
+	}
+	return nil
+}
+
 // Running returns only the instances whose container is currently up.
 func Running() ([]Instance, error) {
 	all, err := List()
