@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/thereisnotime/x11droid/compare/v0.1.1...v0.1.2) (2026-06-11)
+
+
+### Bug Fixes
+
+* **tui:** correct stale Setup help (drop 'Authenticate sudo', add 'Prune Orphan Data') ([fd84297](https://github.com/thereisnotime/x11droid/commit/fd842971f0576cf3a6c6333e0cb135bda586c7f6))
+
 ## [0.1.1](https://github.com/thereisnotime/x11droid/compare/v0.1.0...v0.1.1) (2026-06-11)
 
 
