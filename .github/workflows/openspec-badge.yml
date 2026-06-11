@@ -12,6 +12,10 @@ concurrency:
   group: openspec-badge-${{ github.ref }}
   cancel-in-progress: true
 
+# Self-contained badge generation. The off-the-shelf openspec-badge-action
+# unconditionally runs a change-collection step that crashes (under pipefail)
+# when there are no active changes, so we compute the counts ourselves with the
+# pinned OpenSpec CLI and publish shields SVGs to gh-pages.
 jobs:
   badge:
     runs-on: ubuntu-latest
@@ -20,16 +24,22 @@ jobs:
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
-      # Pin OpenSpec to the version this repo uses. The badge action only
-      # installs OpenSpec if it isn't already on PATH (`command -v openspec`),
-      # and otherwise grabs @latest — where `openspec spec list` is removed and
-      # the action breaks. Pre-installing 1.2.0 keeps the action on a compatible CLI.
-      - name: Install OpenSpec 1.2.0
+      - name: Install OpenSpec
         run: npm install -g @fission-ai/openspec@1.2.0
 
-      - uses: weAretechnative/openspec-badge-action@40e003127410d7fca906446136fde04cf177b225 # v1.1.1
+      - name: Generate OpenSpec badges
+        run: |
+          specs=$(openspec spec list --json 2>/dev/null)
+          n_specs=$(echo "$specs" | node -p 'JSON.parse(require("fs").readFileSync(0,"utf8")).length')
+          n_reqs=$(echo "$specs" | node -p 'JSON.parse(require("fs").readFileSync(0,"utf8")).reduce((s,x)=>s+(x.requirementCount||0),0)')
+          echo "specs=$n_specs requirements=$n_reqs"
+          mkdir -p site/badges
+          curl -fsSL "https://img.shields.io/badge/specs-${n_specs}-8A2BE2" -o site/badges/number_of_specs.svg
+          curl -fsSL "https://img.shields.io/badge/requirements-${n_reqs}-blue" -o site/badges/number_of_requirements.svg
+
+      - name: Publish to gh-pages
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
         with:
-          # Only spec-based metrics: the change-based ones (tasks_status,
-          # open_changes) crash the action under `pipefail` when there are no
-          # active changes. Re-add once changes exist.
-          metric_types: number_of_specs,number_of_requirements
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          keep_files: true
