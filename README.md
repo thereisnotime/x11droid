@@ -307,7 +307,7 @@ sudo podman rmi -f x11droid:latest
 - [x] **Release pipeline** — goreleaser builds Linux amd64/arm64 binaries (+ checksums, syft SBOM, cosign signature, SLSA provenance); release-please drives SemVer + CHANGELOG from conventional commits.
 - [x] **CI/CD** — CI (build · test · lint · CodeQL · Scorecard · security suite · coverage) plus CD (release-please → goreleaser with signing/provenance). Optional container-image publishing intentionally skipped (the image is built locally, not distributed).
 - [ ] **Refactor for testability** — extract the parsing/decision logic out of the podman/waydroid exec wrappers (`container`, `tui`) into pure functions so more of the codebase is unit-testable, raising real coverage beyond the I/O glue.
-- [ ] **Dynamic OpenSpec badges** — re-add the gh-pages badge workflow (spec/requirement/task/change counts) once the first specs/changes are authored; the badge action errors on an empty OpenSpec project.
+- [ ] **Dynamic OpenSpec badges** — auto-counting spec/requirement badges. The off-the-shelf `openspec-badge-action` is incompatible with OpenSpec 1.2.0 (returns empty JSON for `openspec spec list`), so this needs a small custom workflow (compute counts with the pinned OpenSpec, publish to gh-pages / a shields endpoint). Static badge for now.
 - [x] Screenshot/GIF in the README.
 
 ## Contributing
