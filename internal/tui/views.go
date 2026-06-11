@@ -71,6 +71,18 @@ func renderMain(m Model) string {
 		sb.WriteString("\n")
 	}
 
+	if m.orphanNote != "" {
+		note := lipgloss.NewStyle().
+			Foreground(colorYellow).
+			Border(lipgloss.NormalBorder(), false, false, false, true).
+			BorderForeground(colorYellow).
+			Padding(0, 2).
+			Width(m.width - 4).
+			Render("🗑  " + m.orphanNote)
+		sb.WriteString(lipgloss.NewStyle().Padding(1, 2).Render(note))
+		sb.WriteString("\n")
+	}
+
 	sb.WriteString(lipgloss.NewStyle().Padding(1, 2).Bold(true).Foreground(colorSubtext).Render(
 		fmt.Sprintf("Instances (%d)", len(m.instances)),
 	))

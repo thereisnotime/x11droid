@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -100,6 +101,20 @@ func dirSize(dir string) string {
 	return ""
 }
 
+// dirSizeBytes returns dir's size in bytes (du -sb), or 0 on error.
+func dirSizeBytes(dir string) int64 {
+	out, err := exec.Command("du", "-sb", dir).Output()
+	if err != nil {
+		return 0
+	}
+	f := strings.Fields(string(out))
+	if len(f) == 0 {
+		return 0
+	}
+	n, _ := strconv.ParseInt(f[0], 10, 64)
+	return n
+}
+
 // podmanCmd runs the podman CLI directly. x11droid itself must run as root
 // (`sudo x11droid`) because waydroid requires rootful podman — a rootless
 // container cannot associate a loop device (needs real host CAP_SYS_ADMIN) to
@@ -173,6 +188,38 @@ func DataDirs() ([]DataDir, error) {
 		})
 	}
 	return out, nil
+}
+
+// OrphanDiskNote returns a one-line nudge when orphan data dirs (those with no
+// container) total at least thresholdBytes, else "". Shown on the dashboard so
+// the user knows reclaimable disk is sitting around. Pass 500<<20 for 500 MB.
+func OrphanDiskNote(thresholdBytes int64) string {
+	dirs, err := DataDirs()
+	if err != nil {
+		return ""
+	}
+	var total int64
+	var count int
+	for _, d := range dirs {
+		if d.HasContainer {
+			continue
+		}
+		count++
+		total += dirSizeBytes(d.Path)
+	}
+	if count == 0 || total < thresholdBytes {
+		return ""
+	}
+	return fmt.Sprintf("%d orphan data dir(s) using %s with no container — Setup → Prune Orphan Data to reclaim space",
+		count, humanBytes(total))
+}
+
+// humanBytes formats a byte count as GB or MB.
+func humanBytes(b int64) string {
+	if b >= 1<<30 {
+		return fmt.Sprintf("%.1f GB", float64(b)/float64(1<<30))
+	}
+	return fmt.Sprintf("%d MB", b/(1<<20))
 }
 
 // PruneOrphans deletes data dirs that have no container and returns their names.

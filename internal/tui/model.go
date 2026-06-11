@@ -35,6 +35,16 @@ type errMsg struct{ err error }
 type instancesMsg []container.Instance
 type logsMsg string
 type actionDoneMsg struct{ err error }
+type orphanMsg string
+
+// orphanThreshold is the total orphan-data size above which the dashboard nudges
+// the user to prune (data dirs with no container).
+const orphanThreshold = 500 << 20 // 500 MB
+
+func fetchOrphans() tea.Msg {
+	return orphanMsg(container.OrphanDiskNote(orphanThreshold))
+}
+
 type buildDoneMsg struct {
 	buildErr    error
 	imageExists bool
@@ -81,9 +91,10 @@ type Model struct {
 	session   system.Info
 
 	// main view
-	instances []container.Instance
-	cursor    int
-	loading   bool
+	instances  []container.Instance
+	cursor     int
+	loading    bool
+	orphanNote string // non-empty when orphan data dirs exceed the size threshold
 
 	// detail view
 	selected       container.Instance
@@ -157,7 +168,7 @@ func New(sess system.Info) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(fetchInstances, fetchImageStatus, fetchKernelStatus, tick)
+	return tea.Batch(fetchInstances, fetchImageStatus, fetchKernelStatus, fetchOrphans, tick)
 }
 
 func tick() tea.Msg {
@@ -214,6 +225,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.cursor >= len(m.instances) && len(m.instances) > 0 {
 			m.cursor = len(m.instances) - 1
 		}
+		return m, nil
+
+	case orphanMsg:
+		m.orphanNote = string(msg)
 		return m, nil
 
 	case logsMsg:
@@ -295,11 +310,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Refresh in the background (bgInstancesMsg) so the list updates without
 		// clobbering an error we just set — fetchInstances would clear m.err
-		// before it could be read.
+		// before it could be read. Recheck orphans too: prune/remove/purge change
+		// what's orphaned.
 		if m.view == viewSetup {
-			return m, tea.Batch(fetchInstancesBg, fetchKernelStatus, fetchImageStatus)
+			return m, tea.Batch(fetchInstancesBg, fetchKernelStatus, fetchImageStatus, fetchOrphans)
 		}
-		return m, fetchInstancesBg
+		return m, tea.Batch(fetchInstancesBg, fetchOrphans)
 
 	case tea.KeyMsg:
 		return m.handleKey(msg)
