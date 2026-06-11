@@ -166,8 +166,10 @@ put_global() {
     # Write as the shell user (uid 2000 = com.android.shell), not root: guarded
     # settings like development_settings_enabled run a checkPackage on the caller,
     # and root (uid 0) has no package -> getCallingPackage() NPEs. uid 2000 does.
-    # Fall back to a plain root put for unguarded keys / images without `su`.
-    waydroid shell su shell -c "settings put global $k $v" >/dev/null 2>&1 \
+    # Use su's positional command form (no `-c`): `waydroid shell` is argparse-based
+    # and steals a `-c` flag ("unrecognized arguments: -c ..."), so it never reaches
+    # Android. Fall back to a plain root put for unguarded keys / images without su.
+    waydroid shell su shell settings put global "$k" "$v" >/dev/null 2>&1 \
       || waydroid shell settings put global "$k" "$v" >/dev/null 2>&1
     got="$(waydroid shell settings get global "$k" 2>/dev/null | tr -d '\r ')"
     if [ "$got" = "$v" ]; then
