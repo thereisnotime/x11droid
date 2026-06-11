@@ -32,10 +32,16 @@ jobs:
           specs=$(openspec spec list --json 2>/dev/null)
           n_specs=$(echo "$specs" | node -p 'JSON.parse(require("fs").readFileSync(0,"utf8")).length')
           n_reqs=$(echo "$specs" | node -p 'JSON.parse(require("fs").readFileSync(0,"utf8")).reduce((s,x)=>s+(x.requirementCount||0),0)')
-          echo "specs=$n_specs requirements=$n_reqs"
+          changes=$(openspec list --changes --json 2>/dev/null | node -p 'JSON.stringify(JSON.parse(require("fs").readFileSync(0,"utf8")).changes || [])')
+          n_changes=$(echo "$changes" | node -p 'JSON.parse(require("fs").readFileSync(0,"utf8")).length')
+          tasks=$(echo "$changes" | node -p 'const c=JSON.parse(require("fs").readFileSync(0,"utf8")); c.reduce((s,x)=>s+(x.completedTasks||0),0)+"-"+c.reduce((s,x)=>s+(x.totalTasks||0),0)')
+          done_tasks=${tasks%-*}; total_tasks=${tasks#*-}
+          echo "specs=$n_specs requirements=$n_reqs open_changes=$n_changes tasks=$done_tasks/$total_tasks"
           mkdir -p site/badges
           curl -fsSL "https://img.shields.io/badge/specs-${n_specs}-8A2BE2" -o site/badges/number_of_specs.svg
           curl -fsSL "https://img.shields.io/badge/requirements-${n_reqs}-blue" -o site/badges/number_of_requirements.svg
+          curl -fsSL "https://img.shields.io/badge/tasks-${done_tasks}%2F${total_tasks}-lightgrey" -o site/badges/tasks_status.svg
+          curl -fsSL "https://img.shields.io/badge/open_changes-${n_changes}-orange" -o site/badges/open_changes.svg
 
       - name: Publish to gh-pages
         uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0

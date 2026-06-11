@@ -40,7 +40,9 @@
     </td>
     <td>
       <a href="openspec/specs/"><img src="https://raw.githubusercontent.com/thereisnotime/x11droid/gh-pages/badges/number_of_specs.svg" alt="Specs"></a><br>
-      <a href="openspec/specs/"><img src="https://raw.githubusercontent.com/thereisnotime/x11droid/gh-pages/badges/number_of_requirements.svg" alt="Requirements"></a>
+      <a href="openspec/specs/"><img src="https://raw.githubusercontent.com/thereisnotime/x11droid/gh-pages/badges/number_of_requirements.svg" alt="Requirements"></a><br>
+      <a href="openspec/changes/"><img src="https://raw.githubusercontent.com/thereisnotime/x11droid/gh-pages/badges/tasks_status.svg" alt="Tasks"></a><br>
+      <a href="openspec/changes/"><img src="https://raw.githubusercontent.com/thereisnotime/x11droid/gh-pages/badges/open_changes.svg" alt="Open Changes"></a>
     </td>
   </tr>
 </table>
