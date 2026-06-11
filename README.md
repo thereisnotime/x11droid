@@ -303,6 +303,7 @@ sudo podman rmi -f x11droid:latest
 - [ ] **Auto-grant permissions for installed apps** — after installing the optional apps (F-Droid, Aurora, Obtainium, Shelter, Magisk), grant the runtime permissions and special access they need (install-unknown-apps, storage, etc.) via `pm grant` / `appops` / `cmd` so they work out of the box without manual tapping through dialogs.
 - [ ] **Release pipeline** — goreleaser to build and publish binaries (with checksums/SBOM) on git tags; wire the Release-workflow and Latest-Release badges and enable versioned downloads.
 - [ ] **CI/CD** — CI (build · test · lint · CodeQL · Scorecard · coverage) is in place; finish CD: automated tagged releases, signing/provenance, and optional container-image publishing.
+- [ ] **Refactor for testability** — extract the parsing/decision logic out of the podman/waydroid exec wrappers (`container`, `tui`) into pure functions so more of the codebase is unit-testable, raising real coverage beyond the I/O glue.
 - [x] Screenshot/GIF in the README.
 
 ## Contributing
