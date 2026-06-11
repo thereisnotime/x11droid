@@ -1,0 +1,24 @@
+# markdownlint-cli2 configuration.
+# Relaxed ruleset — the README uses HTML badge tables and long lines.
+
+config:
+  # MD013 line-length — prose and tables routinely exceed any sane width.
+  MD013: false
+  # MD033 inline HTML — the README badge tables are raw HTML.
+  MD033: false
+  # MD041 first-line-in-file should be a top-level heading — badge tables come first.
+  MD041: false
+  # MD028 blank line inside blockquote — used deliberately for spacing.
+  MD028: false
+  # MD040 fenced-code-language — plain output/log blocks have no language.
+  MD040: false
+  # MD060 table-column-style — pipe-spacing pedantry, not worth churning docs over.
+  MD060: false
+
+# Files to lint / skip. Generated and vendored trees are excluded.
+globs:
+  - "**/*.md"
+  - "!openspec/**"
+  - "!.claude/**"
+  - "!node_modules/**"
+  - "!CHANGELOG.md"

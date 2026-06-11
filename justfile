@@ -23,7 +23,8 @@ default:
     @echo "  \033[32mvet\033[0m            go vet ./..."
     @echo "  \033[32myamllint\033[0m       yamllint . (YAML)"
     @echo "  \033[32mactionlint\033[0m     actionlint (GitHub workflows)"
-    @echo "  \033[32mcheck\033[0m          vet + test + lint + yamllint + actionlint"
+    @echo "  \033[32mmarkdownlint\033[0m   markdownlint-cli2 (Markdown)"
+    @echo "  \033[32mcheck\033[0m          vet + test + lint + yamllint + actionlint + markdownlint"
     @echo ""
     @echo "\033[1;33m IMAGE\033[0m"
     @echo "  \033[32mimage-build\033[0m    podman build -t {{image}}"
@@ -72,7 +73,10 @@ yamllint:
 actionlint:
     {{actionlint}}
 
-check: vet test lint yamllint actionlint
+markdownlint:
+    npx --yes markdownlint-cli2 "**/*.md"
+
+check: vet test lint yamllint actionlint markdownlint
 
 clean:
     rm -f {{binary}}

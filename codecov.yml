@@ -1,0 +1,23 @@
+# Codecov configuration.
+# x11droid is mostly I/O glue (podman / waydroid / X11), so overall coverage
+# is intentionally low. Coverage status is informational only — it never fails
+# a PR. See CONTRIBUTING.md for context.
+
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+
+# Exclusions — non-logic wiring that isn't a meaningful test target.
+ignore:
+  # main() entrypoint — flag parsing / wiring only, exercised end-to-end
+  - "cmd/x11droid/main.go"
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: true
