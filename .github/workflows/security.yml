@@ -1,0 +1,155 @@
+name: Security
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  schedule:
+    # Run weekly on Monday at 06:00 UTC
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  gosec:
+    name: Go Security (gosec)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+
+      - name: Setup Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c  # v6.4.0
+        with:
+          go-version-file: go.mod
+
+      - name: Install gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@v2.27.1
+
+      - name: Run gosec
+        run: gosec -fmt sarif -out results.sarif ./...
+
+      - name: Upload gosec SARIF
+        uses: github/codeql-action/upload-sarif@dd903d2e4f5405488e5ef1422510ee31c8b32357  # v3.36.2
+        if: always()
+        with:
+          sarif_file: results.sarif
+          category: gosec
+
+  govulncheck:
+    name: Go Vulnerability Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+
+      - name: Setup Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c  # v6.4.0
+        with:
+          go-version-file: go.mod
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+
+      - name: Run govulncheck
+        run: |
+          # Allowlist: space-separated Go vuln IDs that are reviewed and accepted.
+          # Each accepted ID MUST have a justification comment below. Leave empty to accept none.
+          # Example: ACCEPTED_VULNS="GO-2026-4971"  # Windows-only stdlib CVE, N/A on linux/android
+          ACCEPTED_VULNS=""
+
+          govulncheck ./... > /tmp/govuln.txt 2>&1 || VULN_EXIT=$?
+          VULN_EXIT="${VULN_EXIT:-0}"
+          cat /tmp/govuln.txt
+
+          [ "${VULN_EXIT}" -eq 0 ] && exit 0
+
+          # Drop any allowlisted vulnerabilities from consideration first.
+          REMAINING=/tmp/govuln.txt
+          if [ -n "${ACCEPTED_VULNS}" ]; then
+            FOUND_IDS=$(grep -oE 'GO-[0-9]{4}-[0-9]+' /tmp/govuln.txt | sort -u || true)
+            UNACCEPTED=""
+            for id in ${FOUND_IDS}; do
+              skip=""
+              for acc in ${ACCEPTED_VULNS}; do
+                [ "${id}" = "${acc}" ] && skip="yes"
+              done
+              [ -z "${skip}" ] && UNACCEPTED="${UNACCEPTED} ${id}"
+            done
+            if [ -z "$(echo "${UNACCEPTED}" | tr -d '[:space:]')" ]; then
+              echo "::notice::All reported vulnerabilities are in the accepted allowlist: ${ACCEPTED_VULNS}"
+              exit 0
+            fi
+            echo "::error::Unaccepted vulnerabilities found:${UNACCEPTED}"
+            exit "${VULN_EXIT}"
+          fi
+
+          # No allowlist in play. Count total vulnerabilities vs stdlib-only vulnerabilities.
+          # Third-party module vulnerabilities always fail. Stdlib-only vulnerabilities
+          # warn and pass — the fix may require a Go toolchain version not yet released.
+          VULN_COUNT=$(grep -c "^Vulnerability" "${REMAINING}" || true)
+          STDLIB_COUNT=$(grep -c "Standard library" "${REMAINING}" || true)
+
+          if [ "${VULN_COUNT}" -gt 0 ] && [ "${STDLIB_COUNT}" -ge "${VULN_COUNT}" ]; then
+            echo "::warning::${VULN_COUNT} Go stdlib vulnerability(s) found — no fix available in current toolchain. Upgrade the Go toolchain when a patched version is released."
+            exit 0
+          fi
+
+          echo "::error::Third-party module vulnerabilities found."
+          exit "${VULN_EXIT}"
+
+  trivy:
+    name: Trivy Vulnerability Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+
+      - name: Run Trivy (filesystem)
+        id: trivy
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          format: sarif
+          output: trivy-results.sarif
+          exit-code: "1"
+
+      - name: Upload Trivy SARIF
+        uses: github/codeql-action/upload-sarif@dd903d2e4f5405488e5ef1422510ee31c8b32357  # v3.36.2
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy
+
+  gitleaks:
+    name: Secret Scanning (gitleaks)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7  # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
