@@ -1,0 +1,46 @@
+version: 2
+project_name: x11droid
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: ./cmd/x11droid
+    binary: x11droid
+    env:
+      - CGO_ENABLED=0
+    goos: [linux]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+      - -X github.com/thereisnotime/x11droid/internal/version.Version={{.Version}}
+      - -X github.com/thereisnotime/x11droid/internal/version.Commit={{.Commit}}
+      - -X github.com/thereisnotime/x11droid/internal/version.Date={{.Date}}
+
+archives:
+  - formats: [tar.gz]
+
+checksum:
+  name_template: "checksums.txt"
+
+signs:
+  - cmd: cosign
+    args:
+      - sign-blob
+      - --bundle=${artifact}.bundle
+      - ${artifact}
+      - --yes
+    signature: ${artifact}.bundle
+    artifacts: checksum
+
+sboms:
+  - artifacts: archive
+
+changelog:
+  disable: true
+
+release:
+  # release-please creates the GitHub release and owns the changelog; goreleaser
+  # only appends the built binaries, SBOMs and checksums to it.
+  mode: append
