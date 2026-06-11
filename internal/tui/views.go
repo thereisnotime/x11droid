@@ -165,16 +165,7 @@ func renderDetail(m Model) string {
 
 	// Confirmation prompt for a destructive action replaces the action list.
 	if m.confirming != "" {
-		q := fmt.Sprintf("%s \"%s\" — remove the container (data kept)?", m.confirming, m.confirmName)
-		if m.confirming == "Purge" {
-			q = fmt.Sprintf("Purge \"%s\" — delete the container AND all its data? This can't be undone.", m.confirmName)
-		}
-		sb.WriteString(lipgloss.NewStyle().Foreground(colorRed).Bold(true).Padding(0, 2).Render(q))
-		sb.WriteString("\n\n")
-		yes := zone.Mark("confirm-yes", styleActionSelected.Render("  Yes  "))
-		no := zone.Mark("confirm-no", styleAction.Foreground(colorSubtext).Render("  No  "))
-		sb.WriteString(lipgloss.NewStyle().Padding(0, 2).Render(yes + "   " + no + "   " + styleMuted.Render("(y / n)")))
-		sb.WriteString("\n")
+		sb.WriteString(confirmPrompt(confirmQuestion(m.confirming, m.confirmName)))
 		return sb.String()
 	}
 
@@ -323,10 +314,41 @@ func renderSpawn(m Model) (string, int) {
 	return sb.String(), focusLine
 }
 
+// confirmPrompt renders a yes/no confirmation block (clickable Yes/No zones plus
+// y/n keys) for a destructive action. Shared by the detail and setup views.
+func confirmPrompt(question string) string {
+	var sb strings.Builder
+	sb.WriteString(lipgloss.NewStyle().Foreground(colorRed).Bold(true).Padding(0, 2).Render(question))
+	sb.WriteString("\n\n")
+	yes := zone.Mark("confirm-yes", styleActionSelected.Render("  Yes  "))
+	no := zone.Mark("confirm-no", styleAction.Foreground(colorSubtext).Render("  No  "))
+	sb.WriteString(lipgloss.NewStyle().Padding(0, 2).Render(yes + "   " + no + "   " + styleMuted.Render("(y / n)")))
+	sb.WriteString("\n")
+	return sb.String()
+}
+
+// confirmQuestion returns the prompt text for a pending destructive action.
+func confirmQuestion(action, name string) string {
+	switch action {
+	case "Purge":
+		return fmt.Sprintf("Purge %q — delete the container AND all its data? This can't be undone.", name)
+	case "Prune Orphan Data":
+		return "Prune orphan data — delete every instance data dir with no container? This can't be undone."
+	default: // Remove
+		return fmt.Sprintf("%s %q — remove the container (data kept)?", action, name)
+	}
+}
+
 func renderSetup(m Model) string {
 	var sb strings.Builder
 	sb.WriteString(lipgloss.NewStyle().Padding(1, 2).Bold(true).Foreground(colorSubtext).Render("System Setup"))
 	sb.WriteString("\n\n")
+
+	// A pending confirmation replaces the action list.
+	if m.confirming != "" {
+		sb.WriteString(confirmPrompt(confirmQuestion(m.confirming, m.confirmName)))
+		return sb.String()
+	}
 
 	// Kernel modules section.
 	sb.WriteString(lipgloss.NewStyle().Padding(0, 2).Bold(true).Foreground(colorText).Render("Kernel Modules"))

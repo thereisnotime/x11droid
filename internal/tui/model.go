@@ -693,14 +693,22 @@ func (m Model) runConfirmed() (Model, tea.Cmd) {
 	name, action := m.confirmName, m.confirming
 	m.confirming = ""
 	m.confirmName = ""
-	m.view = viewMain
 	switch action {
 	case "Remove":
+		m.view = viewMain
 		m.statusMsg = "Removing..."
 		return m, func() tea.Msg { return actionDoneMsg{container.Remove(name)} }
 	case "Purge":
+		m.view = viewMain
 		m.statusMsg = "Purging (container + data)..."
 		return m, func() tea.Msg { return actionDoneMsg{container.Purge(name)} }
+	case "Prune Orphan Data":
+		// Stays in the setup view where it was triggered.
+		m.statusMsg = "Pruning orphan data..."
+		return m, func() tea.Msg {
+			_, err := container.PruneOrphans()
+			return actionDoneMsg{err}
+		}
 	}
 	return m, nil
 }
@@ -865,11 +873,10 @@ func (m Model) execSetupAction() (Model, tea.Cmd) {
 			}
 		})
 	case "Prune Orphan Data":
-		m.statusMsg = "Pruning orphan data..."
-		return m, func() tea.Msg {
-			_, err := container.PruneOrphans()
-			return actionDoneMsg{err}
-		}
+		// Destructive — ask first (deletes data dirs that have no container).
+		m.confirming = "Prune Orphan Data"
+		m.confirmName = ""
+		return m, nil
 	case "Refresh":
 		return m, tea.Batch(fetchKernelStatus, fetchImageStatus)
 	}
