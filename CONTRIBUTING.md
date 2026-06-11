@@ -23,9 +23,14 @@ Only fall back to raw `go`/`podman` when no `just` recipe covers what you need.
 ## Pull requests
 
 - Keep changes focused and match the surrounding code style.
-- `just check` must pass (CI enforces vet + test + golangci-lint).
+- **Validate with `just` before pushing** — `just check` (vet + test + golangci-lint) and `just build` must pass. CI runs the same; never push red.
 - Describe **what** you changed and **how you tested it** — include your host GPU, kernel, and whether the instance used GApps/ARM/Root, since most bugs are environment-specific.
-- Commit messages: natural, human tone. No `Co-Authored-By` trailers.
+
+## Commits & versioning
+
+- **[Conventional Commits](https://www.conventionalcommits.org/) are mandatory.** Format: `type(scope): summary` — types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`. Add a scope when it helps (`fix(tui): …`, `feat(container): …`). Breaking changes use `!` (`feat!: …`) or a `BREAKING CHANGE:` footer.
+- Keep the summary natural and human — conventional *format*, not robotic wording. No `Co-Authored-By` trailers.
+- **[Semantic Versioning](https://semver.org/) is mandatory** for releases/tags (`vMAJOR.MINOR.PATCH`): breaking → major, `feat` → minor, `fix`/`perf` → patch.
 
 ## Reporting bugs
 

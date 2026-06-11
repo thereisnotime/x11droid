@@ -23,6 +23,12 @@ Use the `just` recipes for all build/test/run/setup tasks. Only fall back to raw
 
 Go is pinned via asdf (`.tool-versions`); recipes call `asdf exec go` / `asdf exec golangci-lint`.
 
+## Git, commits & versioning
+
+- **Conventional Commits are mandatory.** Every commit message is `type(scope): summary` — types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`. Add a scope when it clarifies (`fix(tui): …`, `feat(container): …`). Breaking changes use `!` (`feat!: …`) or a `BREAKING CHANGE:` footer. Keep the summary natural and human — conventional *format*, not robotic wording. Never add `Co-Authored-By` trailers.
+- **Semantic Versioning is mandatory** for tags/releases (`vMAJOR.MINOR.PATCH`): breaking → major, `feat` → minor, `fix`/`perf` → patch. The commit types above drive the bump.
+- **Always validate with `just` before pushing.** Run `just check` (vet + test + lint) and `just build`; they must pass. Never push red. Pull (rebase) before pushing to avoid conflicts.
+
 ## Conventions
 
 - **Rootful podman** (`sudo podman`): waydroid loop-mounts the Android system image, which rootless podman cannot do (loop association needs real host CAP_SYS_ADMIN even with `--privileged`). All podman calls go through `sudo` via `podmanCmd`; authenticate once (Setup → Authenticate sudo / `x11droid setup auth`). Rootful storage is separate from rootless, so the image must be (re)built rootful.
