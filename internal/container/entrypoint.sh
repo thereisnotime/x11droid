@@ -163,7 +163,12 @@ wait_for_boot() {
 put_global() {
   local k="$1" v="$2" i got
   for i in $(seq 1 12); do
-    waydroid shell settings put global "$k" "$v" >/dev/null 2>&1
+    # Write as the shell user (uid 2000 = com.android.shell), not root: guarded
+    # settings like development_settings_enabled run a checkPackage on the caller,
+    # and root (uid 0) has no package -> getCallingPackage() NPEs. uid 2000 does.
+    # Fall back to a plain root put for unguarded keys / images without `su`.
+    waydroid shell su shell -c "settings put global $k $v" >/dev/null 2>&1 \
+      || waydroid shell settings put global "$k" "$v" >/dev/null 2>&1
     got="$(waydroid shell settings get global "$k" 2>/dev/null | tr -d '\r ')"
     if [ "$got" = "$v" ]; then
       echo "[x11droid] set global $k=$v"
@@ -171,8 +176,6 @@ put_global() {
     fi
     sleep 5
   done
-  # Log the last value read back: "null" = the put was rejected; "0" (or other)
-  # = the framework reset it. Distinguishes a permission issue from a race.
   echo "[x11droid] WARNING: could not set global $k=$v (last read: '$got')" >&2
   return 1
 }
