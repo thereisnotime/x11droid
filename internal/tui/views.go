@@ -534,10 +534,10 @@ func renderHelp(m Model) string {
 	sb.WriteString("\n")
 	sb.WriteString(row("↑ / ↓", "navigate actions"))
 	sb.WriteString(row("enter", "run selected action"))
-	sb.WriteString(row("", "  Authenticate sudo — cache sudo creds (rootful podman needs it)"))
 	sb.WriteString(row("", "  Load Modules      — ensure binder_linux is loaded"))
 	sb.WriteString(row("", "  Unload Modules    — rmmod binder_linux"))
-	sb.WriteString(row("", "  Build Image       — sudo podman build x11droid:latest"))
+	sb.WriteString(row("", "  Build Image       — build x11droid:latest (rootful)"))
+	sb.WriteString(row("", "  Prune Orphan Data — delete data dirs with no container"))
 	sb.WriteString(row("", "  Refresh           — re-check status"))
 	sb.WriteString("\n")
 
