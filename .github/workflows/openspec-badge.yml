@@ -29,13 +29,17 @@ jobs:
 
       - name: Generate OpenSpec badges
         run: |
-          specs=$(openspec spec list --json 2>/dev/null)
-          n_specs=$(echo "$specs" | node -p 'JSON.parse(require("fs").readFileSync(0,"utf8")).length')
-          n_reqs=$(echo "$specs" | node -p 'JSON.parse(require("fs").readFileSync(0,"utf8")).reduce((s,x)=>s+(x.requirementCount||0),0)')
-          changes=$(openspec list --changes --json 2>/dev/null | node -p 'JSON.stringify(JSON.parse(require("fs").readFileSync(0,"utf8")).changes || [])')
-          n_changes=$(echo "$changes" | node -p 'JSON.parse(require("fs").readFileSync(0,"utf8")).length')
-          tasks=$(echo "$changes" | node -p 'const c=JSON.parse(require("fs").readFileSync(0,"utf8")); c.reduce((s,x)=>s+(x.completedTasks||0),0)+"-"+c.reduce((s,x)=>s+(x.totalTasks||0),0)')
-          done_tasks=${tasks%-*}; total_tasks=${tasks#*-}
+          # Every OpenSpec call has a fallback and every parse is wrapped in
+          # try/catch so the step always succeeds and publishes all four badges
+          # (with 0 values when there's nothing yet), regardless of CLI quirks.
+          specs=$(openspec spec list --json 2>/dev/null || echo '[]')
+          changes_raw=$(openspec list --changes --json 2>/dev/null || echo '{"changes":[]}')
+          jp() { node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{process.stdout.write(String($1))}catch(e){process.stdout.write('0')}})"; }
+          n_specs=$(printf '%s' "$specs"       | jp 'JSON.parse(d).length')
+          n_reqs=$(printf '%s' "$specs"        | jp 'JSON.parse(d).reduce((s,x)=>s+(x.requirementCount||0),0)')
+          n_changes=$(printf '%s' "$changes_raw" | jp '(JSON.parse(d).changes||[]).length')
+          done_tasks=$(printf '%s' "$changes_raw" | jp '(JSON.parse(d).changes||[]).reduce((s,x)=>s+(x.completedTasks||0),0)')
+          total_tasks=$(printf '%s' "$changes_raw" | jp '(JSON.parse(d).changes||[]).reduce((s,x)=>s+(x.totalTasks||0),0)')
           echo "specs=$n_specs requirements=$n_reqs open_changes=$n_changes tasks=$done_tasks/$total_tasks"
           mkdir -p site/badges
           curl -fsSL "https://img.shields.io/badge/specs-${n_specs}-8A2BE2" -o site/badges/number_of_specs.svg
