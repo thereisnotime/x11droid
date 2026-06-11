@@ -160,11 +160,33 @@ graph TD
 x11droid must run as **root** (`sudo`): waydroid needs rootful podman to loop-mount
 the Android system image — rootless podman cannot, even `--privileged`.
 
-```bash
-# 1. build + install the binary to /usr/local/bin
-just build && just install
+### Install
 
-# 2. run as root
+**Prebuilt binary (recommended)** — signed Linux `amd64`/`arm64` from the [latest release](https://github.com/thereisnotime/x11droid/releases/latest) (each release ships a checksum, a cosign signature, and an SBOM):
+
+```bash
+ver=$(curl -fsSL https://api.github.com/repos/thereisnotime/x11droid/releases/latest | grep -oP '"tag_name": "\K[^"]+')
+arch=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+curl -fsSL "https://github.com/thereisnotime/x11droid/releases/download/${ver}/x11droid_${ver#v}_linux_${arch}.tar.gz" | tar xz x11droid
+sudo install -m 0755 x11droid /usr/local/bin/x11droid
+```
+
+**`go install`** (needs the Go toolchain; version stamp shows `dev`):
+
+```bash
+go install github.com/thereisnotime/x11droid/cmd/x11droid@latest
+sudo install -m 0755 "$(go env GOPATH)/bin/x11droid" /usr/local/bin/x11droid
+```
+
+**From source** (for development — fully version-stamped):
+
+```bash
+just build && just install
+```
+
+### Run
+
+```bash
 sudo x11droid
 ```
 
