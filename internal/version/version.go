@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package version exposes build metadata stamped in at link time via
 // -ldflags -X (see the justfile). A plain `go build` leaves the dev defaults.
 package version

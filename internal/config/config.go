@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package config persists user-tunable defaults for new instances —
 // window resolution, orientation and the compositor to use — to
 // ~/.config/x11droid/config.json.
