@@ -1,0 +1,95 @@
+name: Bug report
+description: Report a problem with x11droid (boot, display, Magisk, dev options, etc.)
+title: "[bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. x11droid is under active development and most issues are environment-specific (GPU, kernel, podman), so please fill in **everything** below — almost all of it is needed to debug.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What went wrong, and what did you expect instead?
+      placeholder: "Spawned an instance with --gapps; it boots to a black screen instead of the launcher."
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The exact commands / TUI actions, in order.
+      placeholder: |
+        1. sudo x11droid setup build
+        2. sudo x11droid spawn test --gapps --root
+        3. Open the instance → Show UI
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: x11droid version
+      description: Output of `x11droid version` (commit + build date).
+      placeholder: "version a1b2c3d  commit a1b2c3d  built 2026-06-11T..."
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: flags
+    attributes:
+      label: Instance options
+      description: Which toggles/flags did the affected instance use?
+      options:
+        - label: GApps
+        - label: ARM translation (libndk)
+        - label: Root (Magisk)
+        - label: Dev Options
+        - label: One of the app installers (F-Droid / Aurora / Obtainium / Shelter)
+        - label: Custom device name
+        - label: Persistent volume
+
+  - type: textarea
+    id: host
+    attributes:
+      label: Host environment
+      description: "Paste the output of the commands below (covers distro, kernel, session, GPU, podman, binder)."
+      value: |
+        # paste output of each:
+        uname -a
+        cat /etc/os-release | head -3
+        echo "session: $XDG_SESSION_TYPE"
+        lspci | grep -iE 'vga|3d|display'
+        podman version | head -5
+        grep binder /proc/filesystems
+        lsmod | grep -i binder
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: |
+        Please include:
+        - `sudo x11droid logs <name>` (container + entrypoint output)
+        - Relevant files from `~/.config/x11droid/instances/<name>/`: `waydroid.log`, `x11droid-cm.log`, `x11droid-debug.log`, and any `x11droid-*.log` related to the problem (`x11droid-magisk*.log`, `x11droid-libndk.log`, `x11droid-devopts.log`).
+      render: shell
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Confirmations
+      options:
+        - label: I ran x11droid as root (`sudo x11droid`) with rootful podman.
+          required: true
+        - label: I'm on a local **X11** session (not Wayland-only).
+          required: true
+        - label: I searched existing issues and this isn't a duplicate.
+          required: true

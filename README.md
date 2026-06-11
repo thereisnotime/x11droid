@@ -5,6 +5,14 @@
 ![Podman](https://img.shields.io/badge/Podman-required-892CA0?logo=podman&logoColor=white)
 ![TUI](https://img.shields.io/badge/TUI-Bubble%20Tea-FF69B4?logo=charm&logoColor=white)
 
+**Don't like Wayland? Want to run Waydroid/Android in X11 as a container instead of a VM? This is what x11droid does.**
+
+> [!IMPORTANT]
+> **[🔓 Keep Android Open](https://keepandroidopen.org/)** — Google is moving to require developer registration to install Android apps. If you value sideloading and an open platform, read the campaign and take action.
+
+> [!NOTE]
+> **Under active development** — expect rough edges and breaking changes. Hit a bug? [Open an issue](https://github.com/thereisnotime/x11droid/issues/new?template=bug_report.yml) — the template collects the host/log info needed to debug.
+
 A CLI/TUI for running and managing [Waydroid](https://waydro.id) instances inside Podman containers on X11.
 
 > Inspired by [use-waydroid-on-x11](https://github.com/1999AZZAR/use-waydroid-on-x11) by 1999AZZAR.
@@ -14,8 +22,8 @@ Each instance is an isolated Podman container running a nested **weston** compos
 > **Runs as root.** waydroid needs rootful podman to loop-mount the Android system image (rootless can't, even `--privileged`). Run the app with `sudo x11droid`; it figures out your display and home automatically.
 
 <p align="center">
-  <img src="docs/screenshot.png" alt="Two x11droid instances running side by side" width="420">
-  <br><sub>Two instances (<code>test1</code>, <code>test2</code>) running at once — fullscreen, native x86.</sub>
+  <img src="docs/two-instances.png" alt="Two x11droid instances running side by side" width="420">
+  <br><sub>Two instances (<code>pixel</code>, <code>samsung</code>) running at once — fullscreen, native x86.</sub>
 </p>
 
 ## Features
@@ -125,6 +133,16 @@ then `n` to create an instance. The Setup screen shows module/image status. Runn
 
 ## TUI
 
+<p align="center">
+  <img src="docs/dashboard.png" alt="x11droid dashboard — instance list with RAM and status" width="760">
+  <br><sub>Dashboard — live instance list with per-instance RAM and status (<code>samsung</code> shows <code>Android off</code>: container up, session not running).</sub>
+</p>
+
+<p align="center">
+  <img src="docs/new-instance.png" alt="x11droid New Instance form" width="680">
+  <br><sub>New Instance — GApps, ARM translation, app toggles, Dev Options, Root (Magisk), and persistence.</sub>
+</p>
+
 ```
 x11droid  /  Dashboard
 ┌─────────────────────────────────────────────────────────┐
@@ -211,4 +229,5 @@ sudo podman rmi -f x11droid:latest
 - [ ] **adb over TCP** — optional `adb connect` to an instance for the full `adb` toolchain (push/pull, `adb logcat -f`, Android Studio).
 - [ ] **Device spoofing presets** — one-click `Build.*` profiles (e.g. a real Pixel) for app compatibility.
 - [ ] **Fix config-folder ownership** — running under `sudo` leaves `~/.config/x11droid/` (instances, images, data) owned by `root`, so the invoking user can't manage or delete them without `sudo`. `chown` the tree back to `SUDO_USER` so it stays user-owned.
+- [ ] **Auto-grant permissions for installed apps** — after installing the optional apps (F-Droid, Aurora, Obtainium, Shelter, Magisk), grant the runtime permissions and special access they need (install-unknown-apps, storage, etc.) via `pm grant` / `appops` / `cmd` so they work out of the box without manual tapping through dialogs.
 - [x] Screenshot/GIF in the README.
