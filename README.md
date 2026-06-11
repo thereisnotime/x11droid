@@ -39,10 +39,7 @@
       <img src="https://img.shields.io/badge/TUI-Bubble%20Tea-FF69B4?logo=charm&logoColor=white" alt="Bubble Tea">
     </td>
     <td>
-      <a href="openspec/specs/"><img src="https://raw.githubusercontent.com/thereisnotime/x11droid/gh-pages/badges/number_of_specs.svg" alt="Specs"></a><br>
-      <a href="openspec/specs/"><img src="https://raw.githubusercontent.com/thereisnotime/x11droid/gh-pages/badges/number_of_requirements.svg" alt="Requirements"></a><br>
-      <a href="openspec/changes/"><img src="https://raw.githubusercontent.com/thereisnotime/x11droid/gh-pages/badges/tasks_status.svg" alt="Tasks"></a><br>
-      <a href="openspec/changes/"><img src="https://raw.githubusercontent.com/thereisnotime/x11droid/gh-pages/badges/open_changes.svg" alt="Open Changes"></a>
+      <a href="openspec/"><img src="https://img.shields.io/badge/OpenSpec-spec--driven-8A2BE2" alt="OpenSpec"></a>
     </td>
   </tr>
 </table>
@@ -310,6 +307,7 @@ sudo podman rmi -f x11droid:latest
 - [x] **Release pipeline** — goreleaser builds Linux amd64/arm64 binaries (+ checksums, syft SBOM, cosign signature, SLSA provenance); release-please drives SemVer + CHANGELOG from conventional commits.
 - [x] **CI/CD** — CI (build · test · lint · CodeQL · Scorecard · security suite · coverage) plus CD (release-please → goreleaser with signing/provenance). Optional container-image publishing intentionally skipped (the image is built locally, not distributed).
 - [ ] **Refactor for testability** — extract the parsing/decision logic out of the podman/waydroid exec wrappers (`container`, `tui`) into pure functions so more of the codebase is unit-testable, raising real coverage beyond the I/O glue.
+- [ ] **Dynamic OpenSpec badges** — re-add the gh-pages badge workflow (spec/requirement/task/change counts) once the first specs/changes are authored; the badge action errors on an empty OpenSpec project.
 - [x] Screenshot/GIF in the README.
 
 ## Contributing

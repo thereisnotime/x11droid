@@ -37,7 +37,13 @@ jobs:
         run: go install github.com/securego/gosec/v2/cmd/gosec@v2.27.1
 
       - name: Run gosec
-        run: gosec -fmt sarif -out results.sarif ./...
+        # Exclusions are inherent to a podman/waydroid orchestrator whose inputs
+        # are its own config, not untrusted external data:
+        #   G204 subprocess with variable args  — x11droid's core job (podman/waydroid CLIs)
+        #   G304 file path from variable         — reads/writes its own instance data dirs
+        #   G301 dir perms (0755)                — config/instance dirs under the user's home
+        #   G306 file perms (0755)               — entrypoint.sh / fake modprobe must be executable
+        run: gosec -exclude=G204,G301,G304,G306 -fmt sarif -out results.sarif ./...
 
       - name: Upload gosec SARIF
         uses: github/codeql-action/upload-sarif@dd903d2e4f5405488e5ef1422510ee31c8b32357  # v3.36.2
