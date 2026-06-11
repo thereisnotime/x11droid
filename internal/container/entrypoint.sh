@@ -161,16 +161,19 @@ wait_for_boot() {
 # confirms it stuck (the settings service rejects writes for a few seconds
 # after boot, which is why the old fire-and-forget put silently failed).
 put_global() {
-  local k="$1" v="$2" i
-  for i in 1 2 3 4 5 6; do
+  local k="$1" v="$2" i got
+  for i in $(seq 1 12); do
     waydroid shell settings put global "$k" "$v" >/dev/null 2>&1
-    if [ "$(waydroid shell settings get global "$k" 2>/dev/null | tr -d '\r ')" = "$v" ]; then
+    got="$(waydroid shell settings get global "$k" 2>/dev/null | tr -d '\r ')"
+    if [ "$got" = "$v" ]; then
       echo "[x11droid] set global $k=$v"
       return 0
     fi
-    sleep 3
+    sleep 5
   done
-  echo "[x11droid] WARNING: could not set global $k=$v" >&2
+  # Log the last value read back: "null" = the put was rejected; "0" (or other)
+  # = the framework reset it. Distinguishes a permission issue from a race.
+  echo "[x11droid] WARNING: could not set global $k=$v (last read: '$got')" >&2
   return 1
 }
 

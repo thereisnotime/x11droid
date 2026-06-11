@@ -298,7 +298,7 @@ func renderSpawn(m Model) (string, int) {
 	tog(6, m.spawnObtainium, "Obtainium", "install Obtainium after first boot")
 	tog(7, m.spawnShelter, "Shelter", "install Shelter after first boot")
 	tog(8, m.spawnDevOptions, "Dev Options", "enable Android Developer Options")
-	tog(9, m.spawnRoot, "Root", "install Magisk (root) on first boot")
+	tog(9, m.spawnRoot, "Root", "install Magisk on first boot — then open Magisk › Direct Install into system partition")
 	tog(10, m.spawnPV, "Persist", "keep Android data between container restarts")
 
 	mark(11)

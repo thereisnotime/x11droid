@@ -74,6 +74,8 @@ The **Root** toggle (or `--root`) installs **Magisk Delta** via [waydroid_script
 
 waydroid_script only pre-seeds the manager apk into the overlay, so the daemon logs `pkg: cannot find io.github.huskydg.magisk` and the **Magisk app won't open / show as rooted**. x11droid works around this by installing the bundled apk properly via PackageManager once Android finishes booting (logged to `instances/<name>/x11droid-magisk-app.log`, marked with `.x11droid-magisk-app`). If the app still misbehaves on an instance created before this fix, respawn it or reinstall the apk: `just apk <name> <path-to-magisk.apk>`.
 
+**Activating root:** after first boot, open the **Magisk** app and use **Direct Install into system partition** — that's the method that reliably activates `su` under waydroid (the boot-image patching options don't apply here). Magisk will ask to reboot; let it. Note that a reboot triggered from inside Android (Magisk's reboot button, or `reboot`) restarts the waydroid session in place, which doesn't always recover cleanly — if you land on a black screen, recreate the container (`x11droid rm <name>` then `spawn` again; data persists, so root stays set up).
+
 Root won't pass Play Integrity / SafetyNet — Magisk is detectable here and there's no hardware-backed attestation in waydroid.
 
 ## Developer Options

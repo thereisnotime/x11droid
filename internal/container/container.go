@@ -456,11 +456,20 @@ func wildXauth(srcXauth, display string) string {
 }
 
 func Start(name string) error {
-	out, err := podmanCmd("start", name).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("podman start %s: %w\n%s", name, err, out)
+	// Right after a Stop, runc/conmon is still tearing down the previous run's
+	// cgroup and netns; an immediate start fails ("resource busy" / cgroup
+	// error). The cleanup finishes within a few seconds, so retry with a short
+	// backoff instead of making the user wait and click Start again.
+	var out []byte
+	var err error
+	for attempt := 0; attempt < 7; attempt++ {
+		out, err = podmanCmd("start", name).CombinedOutput()
+		if err == nil {
+			return nil
+		}
+		time.Sleep(4 * time.Second)
 	}
-	return nil
+	return fmt.Errorf("podman start %s (still failing after retries): %w\n%s", name, err, out)
 }
 
 func Stop(name string) error {
