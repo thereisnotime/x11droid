@@ -20,6 +20,11 @@
     <td>
       <a href="https://github.com/thereisnotime/x11droid/actions/workflows/scorecard.yml"><img src="https://github.com/thereisnotime/x11droid/actions/workflows/scorecard.yml/badge.svg" alt="Scorecard"></a><br>
       <a href="https://securityscorecards.dev/viewer/?uri=github.com/thereisnotime/x11droid"><img src="https://api.securityscorecards.dev/projects/github.com/thereisnotime/x11droid/badge" alt="OpenSSF Scorecard"></a><br>
+      <a href="https://www.bestpractices.dev/en/projects?q=x11droid"><img src="https://img.shields.io/badge/OpenSSF_Best_Practices-register-blue" alt="OpenSSF Best Practices"></a><br>
+      <!-- After registering at https://www.bestpractices.dev/en/projects/new (GitHub login → add this repo),
+           replace the line above with the live badge using your numeric PROJECT_ID:
+      <a href="https://www.bestpractices.dev/projects/PROJECT_ID"><img src="https://www.bestpractices.dev/projects/PROJECT_ID/badge" alt="OpenSSF Best Practices"></a><br>
+      -->
       <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="License: GPL v3"></a>
     </td>
     <td>
