@@ -88,7 +88,7 @@ graph TD
         PODMAN["Podman"]
 
         subgraph CONTAINER["Podman Container  ─  x11droid:latest (rootful)"]
-            CAGE["weston\npixman · kiosk shell"]
+            WESTON["weston\npixman · kiosk shell"]
 
             subgraph WD["Waydroid Session"]
                 WDSVC["waydroid services\nAndroid HAL / SurfaceFlinger"]
@@ -110,8 +110,8 @@ graph TD
 
     TUI -- "podman CLI\nspawn · start · stop · remove" --> PODMAN
     PODMAN -- "create / manage" --> CONTAINER
-    CAGE -- "X11 client\n DISPLAY env + socket" --> X11
-    CAGE -- "Wayland socket\nwayland-0" --> WDSVC
+    WESTON -- "X11 client\n DISPLAY env + socket" --> X11
+    WESTON -- "Wayland socket\nwl-NAME (per-instance)" --> WDSVC
     WDSVC --> LXC
     INIT --> APPS
     LXC -- "binder IPC" --> BINDER
@@ -126,7 +126,7 @@ graph TD
     style KERNEL fill:#1a1a1a,stroke:#333,color:#aaa
     style TUI fill:#2d6a4f,stroke:#52b788,color:#fff
     style PODMAN fill:#892CA0,stroke:#c77dff,color:#fff
-    style CAGE fill:#1d3557,stroke:#457b9d,color:#fff
+    style WESTON fill:#1d3557,stroke:#457b9d,color:#fff
     style X11 fill:#333,stroke:#666,color:#bbb
     style WDSVC fill:#023e8a,stroke:#0096c7,color:#fff
     style BINDER fill:#3d0000,stroke:#9d0208,color:#ffc,font-size:12px

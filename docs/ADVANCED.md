@@ -61,7 +61,7 @@ compositor forwarded to the host X11 server.
 - **X11 auth** — the container connects as real root with a different hostname, so x11droid finds the live `XAUTHORITY` via `/proc` and writes a hostname-agnostic (FamilyWild) cookie.
 - **binder** — kernels with `CONFIG_ANDROID_BINDER_DEVICES=""` create no device nodes, so the entrypoint mounts **binderfs** and allocates the device names from `waydroid.cfg` (`anbox-binder`, …) via the `BINDER_CTL_ADD` ioctl.
 - **D-Bus** — no systemd, so the entrypoint runs its own **system** and **session** buses and waits for each before use.
-- **Networking** — *not* `--network=host` (rootless can't modify the host netns); the container gets its own netns so waydroid can create the `waydroid0` bridge.
+- **Networking** — *not* `--network=host`; the container gets its own netns so waydroid can create the `waydroid0` bridge in isolation, without touching the host network.
 - **cgroups / threads** — `--cgroupns=host` (controller delegation) and `--pids-limit=-1` (Android/GMS exceeds podman's 2048 default → `pthread_create` reboot loop).
 
 The container entrypoint is `internal/container/entrypoint.sh` (embedded in the binary and copied into the image).
