@@ -39,7 +39,8 @@
       <img src="https://img.shields.io/badge/TUI-Bubble%20Tea-FF69B4?logo=charm&logoColor=white" alt="Bubble Tea">
     </td>
     <td>
-      <a href="openspec/"><img src="https://img.shields.io/badge/OpenSpec-spec--driven-8A2BE2" alt="OpenSpec"></a>
+      <a href="openspec/specs/"><img src="https://raw.githubusercontent.com/thereisnotime/x11droid/gh-pages/badges/number_of_specs.svg" alt="Specs"></a><br>
+      <a href="openspec/specs/"><img src="https://raw.githubusercontent.com/thereisnotime/x11droid/gh-pages/badges/number_of_requirements.svg" alt="Requirements"></a>
     </td>
   </tr>
 </table>
@@ -307,7 +308,7 @@ sudo podman rmi -f x11droid:latest
 - [x] **Release pipeline** — goreleaser builds Linux amd64/arm64 binaries (+ checksums, syft SBOM, cosign signature, SLSA provenance); release-please drives SemVer + CHANGELOG from conventional commits.
 - [x] **CI/CD** — CI (build · test · lint · CodeQL · Scorecard · security suite · coverage) plus CD (release-please → goreleaser with signing/provenance). Optional container-image publishing intentionally skipped (the image is built locally, not distributed).
 - [ ] **Refactor for testability** — extract the parsing/decision logic out of the podman/waydroid exec wrappers (`container`, `tui`) into pure functions so more of the codebase is unit-testable, raising real coverage beyond the I/O glue.
-- [ ] **Dynamic OpenSpec badges** — auto-counting spec/requirement badges. The off-the-shelf `openspec-badge-action` is incompatible with OpenSpec 1.2.0 (returns empty JSON for `openspec spec list`), so this needs a small custom workflow (compute counts with the pinned OpenSpec, publish to gh-pages / a shields endpoint). Static badge for now.
+- [x] **Dynamic OpenSpec badges** — spec/requirement counts auto-published to gh-pages by a self-contained workflow (the off-the-shelf action crashes on a 0-active-changes project). Task/change-progress badges can be added once active changes exist.
 - [x] Screenshot/GIF in the README.
 
 ## Contributing
