@@ -14,6 +14,8 @@
     </td>
     <td>
       <a href="https://goreportcard.com/report/github.com/thereisnotime/x11droid"><img src="https://goreportcard.com/badge/github.com/thereisnotime/x11droid" alt="Go Report Card"></a><br>
+      <a href="https://codecov.io/gh/thereisnotime/x11droid"><img src="https://codecov.io/gh/thereisnotime/x11droid/graph/badge.svg" alt="codecov"></a><br>
+      <a href="https://pkg.go.dev/github.com/thereisnotime/x11droid"><img src="https://pkg.go.dev/badge/github.com/thereisnotime/x11droid.svg" alt="Go Reference"></a><br>
       <a href="go.mod"><img src="https://img.shields.io/github/go-mod/go-version/thereisnotime/x11droid" alt="Go Version"></a><br>
       <a href="https://github.com/thereisnotime/x11droid/commits/master"><img src="https://img.shields.io/github/last-commit/thereisnotime/x11droid" alt="Last commit"></a>
     </td>
@@ -295,6 +297,8 @@ sudo podman rmi -f x11droid:latest
 - [ ] **Device spoofing presets** — one-click `Build.*` profiles (e.g. a real Pixel) for app compatibility.
 - [ ] **Fix config-folder ownership** — running under `sudo` leaves `~/.config/x11droid/` (instances, images, data) owned by `root`, so the invoking user can't manage or delete them without `sudo`. `chown` the tree back to `SUDO_USER` so it stays user-owned.
 - [ ] **Auto-grant permissions for installed apps** — after installing the optional apps (F-Droid, Aurora, Obtainium, Shelter, Magisk), grant the runtime permissions and special access they need (install-unknown-apps, storage, etc.) via `pm grant` / `appops` / `cmd` so they work out of the box without manual tapping through dialogs.
+- [ ] **Release pipeline** — goreleaser to build and publish binaries (with checksums/SBOM) on git tags; wire the Release-workflow and Latest-Release badges and enable versioned downloads.
+- [ ] **CI/CD** — CI (build · test · lint · CodeQL · Scorecard · coverage) is in place; finish CD: automated tagged releases, signing/provenance, and optional container-image publishing.
 - [x] Screenshot/GIF in the README.
 
 ## Contributing
