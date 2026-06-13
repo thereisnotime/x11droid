@@ -39,6 +39,20 @@ The bare command opens the TUI. Subcommands are scriptable:
 | `--dev-options` | off | Enable Android Developer Options on first boot |
 | `--root` | off | Install Magisk (root) on first boot |
 | `--no-pv` | off | Disable the persistent volume (data won't survive removal) |
+| `--system-image <src>` | official | Custom system image — path or `http(s)` URL to a raw `.img` or a `.zip` (requires `--vendor-image`) |
+| `--vendor-image <src>` | official | Custom vendor image — path or `http(s)` URL to a raw `.img` or a `.zip` (requires `--system-image`) |
+
+#### Custom images (e.g. newer Android than official Waydroid)
+
+Official Waydroid tops out at **Android 13** (LineageOS 20). To run a different build — say a community **Android 15** (LineageOS 22) `waydroid_x86_64` image — pass both halves to `spawn`:
+
+```bash
+sudo x11droid spawn a15 \
+  --system-image https://example/lineage-22.2-...-waydroid_x86_64-system.zip \
+  --vendor-image https://example/lineage-22.2-...-waydroid_x86_64-vendor.zip
+```
+
+Each source may be a local path or an `http(s)` URL, and either a raw `.img` or a `.zip` (the matching `system.img`/`vendor.img` is extracted automatically). x11droid downloads, unzips, and sanity-checks the images (rejects truncated downloads and still-sparse images — run `simg2img` first if needed), drops them into `~/.config/x11droid/extra-images/<name>/`, and mounts that at `/etc/waydroid-extra/images` so `waydroid init` uses them instead of the official download. **Both** flags are required together. Custom images are unofficial/userdebug builds — quality varies, and the libndk/Magisk install scripts target older Lineage so may need tweaks on newer Android.
 
 Resolution / orientation / compositor come from the saved **Config** (TUI: `c`), persisted to `~/.config/x11droid/config.json`.
 
