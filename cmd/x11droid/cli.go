@@ -44,7 +44,7 @@ func cmdList() *cobra.Command {
 
 func cmdSpawn() *cobra.Command {
 	var gapps, hidearm, fdroid, aurora, obtainium, shelter, devOptions, root, noPV bool
-	var deviceName string
+	var deviceName, systemImage, vendorImage string
 
 	c := &cobra.Command{
 		Use:   "spawn <name>",
@@ -54,20 +54,22 @@ func cmdSpawn() *cobra.Command {
 			cfg := config.Load()
 			w, h := cfg.EffectiveDims()
 			return container.Spawn(container.SpawnOpts{
-				Name:       args[0],
-				DeviceName: deviceName,
-				GApps:      gapps,
-				HideARM:    hidearm,
-				FDroid:     fdroid,
-				Aurora:     aurora,
-				Obtainium:  obtainium,
-				Shelter:    shelter,
-				DevOptions: devOptions,
-				Root:       root,
-				PV:         !noPV,
-				Width:      w,
-				Height:     h,
-				Compositor: cfg.Compositor,
+				Name:        args[0],
+				DeviceName:  deviceName,
+				GApps:       gapps,
+				HideARM:     hidearm,
+				FDroid:      fdroid,
+				Aurora:      aurora,
+				Obtainium:   obtainium,
+				Shelter:     shelter,
+				DevOptions:  devOptions,
+				Root:        root,
+				PV:          !noPV,
+				Width:       w,
+				Height:      h,
+				Compositor:  cfg.Compositor,
+				SystemImage: systemImage,
+				VendorImage: vendorImage,
 			})
 		},
 	}
@@ -81,6 +83,8 @@ func cmdSpawn() *cobra.Command {
 	c.Flags().BoolVar(&devOptions, "dev-options", false, "enable Android Developer Options on first boot")
 	c.Flags().BoolVar(&root, "root", false, "install Magisk (root) on first boot")
 	c.Flags().BoolVar(&noPV, "no-pv", false, "disable persistent volume")
+	c.Flags().StringVar(&systemImage, "system-image", "", "custom system image: path or http(s) URL to a raw .img or .zip (requires --vendor-image)")
+	c.Flags().StringVar(&vendorImage, "vendor-image", "", "custom vendor image: path or http(s) URL to a raw .img or .zip (requires --system-image)")
 	return c
 }
 

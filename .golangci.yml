@@ -9,6 +9,14 @@ linters:
     - ineffassign
     - misspell
     - bodyclose
+  settings:
+    errcheck:
+      # Best-effort cleanup whose error is not actionable.
+      exclude-functions:
+        - (io.Closer).Close
+        - (io.ReadCloser).Close
+        - (*os.File).Close
+        - os.Remove
   exclusions:
     rules:
       - path: "_test\\.go"
