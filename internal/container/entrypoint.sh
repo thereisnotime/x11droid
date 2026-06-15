@@ -9,6 +9,7 @@ GAPPS="${WAYDROID_GAPPS:-}"
 HIDEARM="${WAYDROID_HIDEARM:-}"
 ROOT="${WAYDROID_ROOT:-}"
 DEVOPTS="${WAYDROID_DEVOPTS:-}"
+CUSTOM_IMAGES="${WAYDROID_CUSTOM_IMAGES:-}"
 APPS="${WAYDROID_APPS:-}"
 W="${WAYDROID_WIDTH:-540}"
 H="${WAYDROID_HEIGHT:-960}"
@@ -75,10 +76,16 @@ mkdir -p /var/lib/waydroid/data /root/.local/share/waydroid
 
 # --- first-run init (downloads ~1GB) --------------------------------------
 if [ ! -f /var/lib/waydroid/images/system.img ]; then
-  echo "[x11droid] First run: initialising Waydroid (downloads ~1GB, please wait)..."
-  if [ -n "$GAPPS" ]; then
+  if [ -n "$CUSTOM_IMAGES" ]; then
+    # Custom system/vendor image is mounted at /etc/waydroid-extra/images;
+    # waydroid init picks it up there instead of downloading the official image.
+    echo "[x11droid] First run: initialising Waydroid from custom image (/etc/waydroid-extra/images)..."
+    waydroid init -f
+  elif [ -n "$GAPPS" ]; then
+    echo "[x11droid] First run: initialising Waydroid with GApps (downloads ~1GB, please wait)..."
     waydroid init -f -s GAPPS
   else
+    echo "[x11droid] First run: initialising Waydroid (downloads ~1GB, please wait)..."
     waydroid init -f
   fi
   if [ $? -ne 0 ]; then

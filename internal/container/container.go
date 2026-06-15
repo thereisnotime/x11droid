@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/thereisnotime/x11droid/internal/image"
 	"github.com/thereisnotime/x11droid/internal/kernel"
 	"github.com/thereisnotime/x11droid/internal/system"
 )
@@ -325,6 +326,31 @@ type SpawnOpts struct {
 	Width      int    // compositor window width  (0 = image default)
 	Height     int    // compositor window height (0 = image default)
 	Compositor string // "", "auto", "weston" or "cage"
+
+	// Custom image source (path or http(s) URL to a raw .img or a .zip). Both
+	// must be set together; empty means use the official `waydroid init` images.
+	SystemImage string
+	VendorImage string
+}
+
+// resolveCustomImages requires both image sources, resolves each (download /
+// unzip / validate) into ~/.config/x11droid/extra-images/<name>/, and returns
+// that dir to mount at /etc/waydroid-extra/images.
+func resolveCustomImages(opts SpawnOpts) (string, error) {
+	if opts.SystemImage == "" || opts.VendorImage == "" {
+		return "", fmt.Errorf("a custom image needs both --system-image and --vendor-image")
+	}
+	dir := filepath.Join(configDir(), "extra-images", opts.Name)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("create extra-images dir: %w", err)
+	}
+	if err := image.Resolve(opts.SystemImage, filepath.Join(dir, "system.img"), "system.img"); err != nil {
+		return "", fmt.Errorf("system image: %w", err)
+	}
+	if err := image.Resolve(opts.VendorImage, filepath.Join(dir, "vendor.img"), "vendor.img"); err != nil {
+		return "", fmt.Errorf("vendor image: %w", err)
+	}
+	return dir, nil
 }
 
 // selectedApps returns the comma-separated WAYDROID_APPS value for the apps the
@@ -469,6 +495,21 @@ func Spawn(opts SpawnOpts) error {
 	if opts.DeviceName != "" {
 		args = append(args, "-e", fmt.Sprintf("WAYDROID_DEVICE=%s", opts.DeviceName))
 	}
+
+	// Custom system/vendor image: resolve (download / unzip / validate) both into
+	// a host dir mounted at /etc/waydroid-extra/images, which `waydroid init`
+	// uses instead of downloading the official image.
+	if opts.SystemImage != "" || opts.VendorImage != "" {
+		extra, err := resolveCustomImages(opts)
+		if err != nil {
+			return err
+		}
+		args = append(args,
+			"-e", "WAYDROID_CUSTOM_IMAGES=1",
+			"-v", fmt.Sprintf("%s:/etc/waydroid-extra/images:ro", extra),
+		)
+	}
+
 	args = append(args, "x11droid:latest")
 
 	out, err := podmanCmd(args...).CombinedOutput()
